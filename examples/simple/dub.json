@@ -1,0 +1,8 @@
+{
+    "name": "simple-usage",
+
+    "dependencies":
+    {
+        "console-colors": { "path": "../.." }
+    }
+}

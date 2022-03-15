@@ -1,0 +1,10 @@
+{
+    "name": "console-colors",
+
+    "license": "BSL-1.0",
+
+    "description": "If it's worth having a command-line, then it's worth having colors.",
+
+    "importPaths": ["source"],
+    "sourcePaths": ["source"]
+}
