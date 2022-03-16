@@ -125,9 +125,9 @@ string color(const(char)[] text, const(char)[] color) pure @safe
 ///    <grey>, <lred>, <lgreen>, <yellow>, <lblue>, <lmagenta>, <lcyan>, <white>
 /// 
 /// Escaping:
-/// - To pass '<' as text and not a tag, use &lt; or &#60;
-/// - To pass '>' as text and not a tag, use &gt; or &#62;
-///
+/// - To pass '<' as text and not a tag, use &lt;
+/// - To pass '>' as text and not a tag, use &gt;
+/// - To pass '&' as text not an entity, use &amp;
 void cwrite(T...)(T args)
 {
     import std.conv : to;
@@ -452,12 +452,41 @@ private:
             }
             throw new Exception("Unterminated tag");
         }
-        /*else if (peek() == '&')
+        else if (peek() == '&')
         {
             // it is an HTML entity
+            next;
+            if (!hasNextChar())
+                throw new Exception("Excepted entity name after &");
 
-
-        } */
+            int startOfEntity = inputPos;
+            while(hasNextChar())
+            {
+                char ch = peek();
+                if (ch == ';')
+                {
+                    const(char)[] entityName = charsSincePos(startOfEntity);
+                    switch (entityName)
+                    {
+                        case "lt": r.text = "<"; break;
+                        case "gt": r.text = ">"; break;
+                        case "amp": r.text = "&"; break;
+                        default: 
+                            throw new Exception("Unknown entity name");
+                    }
+                    next;
+                    r.type = TokenType.text;
+                    return r;
+                }
+                else if ((ch >= 'a' && ch <= 'z') || (ch >= 'a' && ch <= 'z'))
+                {
+                    next;
+                }
+                else
+                    throw new Exception("Illegal character in entity name, you probably mean &lt; or &gt; or &amp;");                
+            }
+            throw new Exception("Unfinished entity name, you probably mean &lt; or &gt; or &amp;");
+        }
         else 
         {
             int startOfText = inputPos;
