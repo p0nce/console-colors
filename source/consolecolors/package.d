@@ -226,6 +226,7 @@ shared static this()
 
 shared static ~this()
 {
+    destroy(g_termInterpreter);
 }
 
 struct TermInterpreter
@@ -237,6 +238,10 @@ struct TermInterpreter
             _terminal = Terminal(ConsoleOutputType.linear);
             _enableTerm = true;
         }
+    }
+
+    ~this()
+    {
     }
 
     void disableColors()
@@ -254,6 +259,9 @@ struct TermInterpreter
         input = s;
         inputPos = 0;
 
+        _tagStack[0] = Tag(Color.DEFAULT, Color.DEFAULT, "html");
+        _tagStackIndex = 1;
+
         bool finished = false;
         bool termTextWasOutput = false;
         while(!finished)
@@ -266,8 +274,23 @@ struct TermInterpreter
                     final switch(token.type)
                     {
                         case TokenType.tagOpen:
+                        {
+                            enterTag(token.text);
+                            break;
+                        }
+
                         case TokenType.tagClose:
+                        {
+                            exitTag(token.text);
+                            break;
+                        }
+
                         case TokenType.tagOpenClose:
+                        {
+                            enterTag(token.text);
+                            exitTag(token.text);
+                            break;
+                        }
 
                         case TokenType.text:
                         {
@@ -311,6 +334,84 @@ private:
     bool _enableTerm = false;
     Terminal _terminal;
 
+    Color _bg = Color.DEFAULT;
+    Color _fg = Color.DEFAULT;
+
+    // Style/Tag stack
+    static struct Tag
+    {
+        int fg;  // last applied foreground color
+        int bg;  // last applied background color
+        const(char)[] name; // last applied tag
+    }
+    enum int MAX_NESTED_TAGS = 32;
+
+    Tag[MAX_NESTED_TAGS] _tagStack;
+    int _tagStackIndex;
+
+    void enterTag(const(char)[] tagName)
+    {
+        if (_tagStackIndex >= MAX_NESTED_TAGS)
+            throw new Exception("Tag stack is full, internal error of console-colors");
+
+        // dup top of stack, set foreground color
+        _tagStack[_tagStackIndex + 1] = _tagStack[_tagStackIndex];
+        _tagStackIndex += 1;
+        _tagStack[_tagStackIndex].name = tagName;
+    
+        switch(tagName)
+        {
+            case "black":   setForeground(Color.black); break;
+            case "red":     setForeground(Color.red); break;
+            case "green":   setForeground(Color.green); break;
+            case "brown":   setForeground(Color.yellow); break;
+            case "blue":    setForeground(Color.blue); break;
+            case "magenta": setForeground(Color.magenta); break;
+            case "cyan":    setForeground(Color.cyan); break;
+            case "lgrey":   setForeground(Color.white); break;
+            case "grey":    setForeground(Color.black | Bright); break;
+            case "lred":    setForeground(Color.red | Bright); break;
+            case "lgreen":  setForeground(Color.green | Bright); break;
+            case "yellow":  setForeground(Color.yellow | Bright); break;
+            case "lblue":   setForeground(Color.blue | Bright); break;
+            case "lmagenta":setForeground(Color.magenta | Bright); break;
+            case "lcyan":   setForeground(Color.cyan | Bright); break;
+            case "white":   setForeground(Color.white | Bright); break;
+            default:
+                break; // unknown tag
+        }
+    }
+
+    void setForeground(int fg)
+    {
+        if (_tagStack[_tagStackIndex].fg != fg)
+        {
+            _tagStack[_tagStackIndex].fg = fg;
+            applyStyleOnTop();
+        }
+    }
+
+    void applyStyleOnTop()
+    {
+        if (_enableTerm)
+        {
+            _terminal.color(_tagStack[_tagStackIndex].fg, _tagStack[_tagStackIndex].bg);
+        }
+    }
+
+    void exitTag(const(char)[] tagName)
+    {
+        if (_tagStackIndex <= 0)
+            throw new Exception("Unexpected closing tag");
+        
+        if (_tagStack[_tagStackIndex].name != tagName)
+            throw new Exception("Closing tag mismatch");
+
+        // drop one state of stack, apply old style
+        _tagStackIndex -= 1;
+        applyStyleOnTop();
+    }
+
     // <parser>
 
     ParserState _parserState = ParserState.initial;
@@ -320,12 +421,6 @@ private:
     }
 
     // </parser>
-
-   /* static struct Tag
-    {
-        int type; // 0 = open   1 = closed   2 = open and closed
-        const(char)[] name; // tag name
-    } */
 
     // <lexer>
 
