@@ -251,6 +251,9 @@ struct TermInterpreter
         // Init tag stack.
         // State is reset between all calls to interpret, so that errors can be eaten out.
 
+        input = s;
+        inputPos = 0;
+
         bool finished = false;
         bool termTextWasOutput = false;
         while(!finished)
@@ -262,7 +265,9 @@ struct TermInterpreter
                     Token token = getNextToken();
                     final switch(token.type)
                     {
-                        case TokenType.tag:
+                        case TokenType.tagOpen:
+                        case TokenType.tagClose:
+                        case TokenType.tagOpenClose:
 
                         case TokenType.text:
                         {
@@ -306,21 +311,40 @@ private:
     bool _enableTerm = false;
     Terminal _terminal;
 
+    // <parser>
+
     ParserState _parserState = ParserState.initial;
     enum ParserState
     {
         initial
     }
 
-    static struct Tag
+    // </parser>
+
+   /* static struct Tag
     {
         int type; // 0 = open   1 = closed   2 = open and closed
         const(char)[] name; // tag name
+    } */
+
+    // <lexer>
+
+    const(char)[] input;
+    int inputPos;
+
+    LexerState _lexerState = LexerState.initial;
+    enum LexerState
+    {
+        initial,
+        insideEntity,
+        insideTag,
     }
 
     enum TokenType
     {
-        tag,
+        tagOpen,      // <red>
+        tagClose,     // </red>
+        tagOpenClose, // <red/> 
         text,
         endOfInput
     }
@@ -333,18 +357,125 @@ private:
         const(char)[] text = null; 
 
         // position in input text
-        int col = 0;
+        int inputPos = 0;
     }
 
-    bool hasNextToken()
+    bool hasNextChar()
     {
-        return false;
+        return inputPos < input.length;
+    }
+
+    char peek()
+    {
+        return input[inputPos];
+    }
+
+    const(char)[] lastNChars(int n)
+    {
+        return input[inputPos - n .. inputPos];
+    }
+
+    const(char)[] charsSincePos(int pos)
+    {
+        return input[pos .. inputPos];
+    }
+
+    void next()
+    {
+        inputPos += 1;
     }
 
     Token getNextToken()
     {
-        Token tok;
-        tok.type = TokenType.endOfInput;
-        return tok;
+        Token r;
+        r.inputPos = inputPos;
+
+        if (!hasNextChar())
+        {
+            r.type = TokenType.endOfInput;
+            return r;
+        }
+        else if (peek() == '<')
+        {
+            // it is a tag
+            bool closeTag = false;
+            next;
+            if (!hasNextChar())
+                throw new Exception("Excepted tag name after <");
+
+            if (peek() == '/')
+            {
+                closeTag = true;
+                next;
+                if (!hasNextChar())
+                    throw new Exception("Excepted tag name after </");
+            }
+
+            const(char)[] tagName;
+            int startOfTagName = inputPos;
+            
+            while(hasNextChar())
+            {
+                char ch = peek();
+                if (ch == '/')
+                {
+                    tagName = charsSincePos(startOfTagName);
+                    if (closeTag)
+                        throw new Exception("Can't have tags like this </tagname/>");
+
+                    next;
+                    if (!hasNextChar())
+                        throw new Exception("Excepted '>' in closing tag ");
+
+                    if (peek() == '>')
+                    {
+                        next;
+
+                        r.type = TokenType.tagOpenClose;
+                        r.text = tagName;
+                        return r;
+                    }
+                }
+                else if (ch == '>')
+                {
+                    tagName = charsSincePos(startOfTagName);
+                    next;
+                    r.type = closeTag ? TokenType.tagClose : TokenType.tagOpen;
+                    r.text = tagName;
+                    return r;
+                }
+                else
+                {
+                    next;
+                }
+                // TODO: check chars are valid in HTML tags
+            }
+            throw new Exception("Unterminated tag");
+        }
+        /*else if (peek() == '&')
+        {
+            // it is an HTML entity
+
+
+        } */
+        else 
+        {
+            int startOfText = inputPos;
+            while(hasNextChar())
+            {
+                char ch = peek();
+                if (ch == '>')
+                    throw new Exception("Illegal character >, use &gt; instead if intended");
+                if (ch == '<') 
+                    break;
+                if (ch == '&') 
+                    break;
+                next;
+            }
+            assert(inputPos != startOfText);
+            r.type = TokenType.text;
+            r.text = charsSincePos(startOfText);
+            return r;
+        }
     }
 }
