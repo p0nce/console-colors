@@ -6,5 +6,10 @@
     "description": "If it's worth having a command-line, then it's worth having colors.",
 
     "importPaths": ["source"],
-    "sourcePaths": ["source"]
+    "sourcePaths": ["source"],
+
+    "dependencies":
+    {
+        "arsd-official:terminal": "~>10.0"
+    }
 }

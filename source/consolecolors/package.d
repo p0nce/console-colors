@@ -6,9 +6,12 @@
 */
 module consolecolors;
 
+import arsd.terminal;
+
 import core.stdc.stdio: FILE, fwrite, fflush, fputc;
 import std.stdio : File, stdout;
 import std.string: format;
+
 
 public:
 
@@ -110,54 +113,22 @@ string color(const(char)[] text, const(char)[] color) pure @safe
     return format("<%s>%s</%s>", color, text, color);
 }
 
-
 /// Coloured `write`/`writef`/`writeln`/`writefln`.
 ///
 /// The language that these function take as input can contain HTML tags.
-///
+/// Unknown tags have no effect and are removed.
+/// Tags can't have attributes.
+/// 
 /// Accepted tags:
-/// - <COLORNAME>
+/// - <COLORNAME> such as:
+///    <black>, <red>, <green>, <brown>, <blue>, <magenta>, <cyan>, <lgrey>, 
+///    <grey>, <lred>, <lgreen>, <yellow>, <lblue>, <lmagenta>, <lcyan>, <white>
 /// 
 /// Escaping:
 /// - To pass '<' as text and not a tag, use &lt; or &#60;
 /// - To pass '>' as text and not a tag, use &gt; or &#62;
 ///
-/// Available color names:
-/// 
-void cwrite(T...)(T args) if (!is(T[0] : File))
-{
-    stdout.cwrite(args);
-}
-
-/// Coloured `writef`.
-void cwritef(Char, T...)(in Char[] fmt, T args) if (!is(T[0] : File))
-{
-    stdout.cwritef(fmt, args);
-}
-
-///ditto
-void cwritefln(Char, T...)(in Char[] fmt, T args)
-{
-    stdout.cwritef(fmt ~ "\n", args);
-}
-
-///ditto
-void cwriteln(T...)(T args)
-{
-    // Most general instance
-    stdout.cwrite(args, '\n');
-}
-
-///ditto
-void cwritef(Char, A...)(File f, in Char[] fmt, A args)
-{
-    import std.string : format;
-    auto s = format(fmt, args);
-    f.cwrite(s);
-}
-
-///ditto
-void cwrite(S...)(File f, S args)
+void cwrite(T...)(T args)
 {
     import std.conv : to;
 
@@ -166,13 +137,7 @@ void cwrite(S...)(File f, S args)
     foreach(arg; args)
         s ~= to!string(arg);
 
-    FILE* file = f.getFP();
-
-
-    // TEMP
-    s = hack(s);
-
-    int res = emitToTerminal(file, s);
+    int res = emitToTerminal(s);
 
     // Throw error if parsing error.
     switch(res)
@@ -181,53 +146,31 @@ void cwrite(S...)(File f, S args)
         case CC_UNTERMINATED_TAG: throw new Exception("Unterminated <tag> in coloured text");
         case CC_UNKNOWN_TAG:      throw new Exception("Unknown <tag> in coloured text");
         case CC_MISMATCHED_TAG:   throw new Exception("Mismatched <tag> in coloured text");
+        case CC_TERMINAL_ERROR:   throw new Exception("Unspecified terminal error");
         default:
             assert(false); // if you fail here, console-colors is buggy
     }
 }
 
-// TEMPORARY, very slow
-string hack(string s)
+///ditto
+void cwriteln(T...)(T args)
 {
-    import std.string: replace;
-    s = s.replace("<black>", "\033[30m");
-    s = s.replace("</black>", "\033[0m");
-    s = s.replace("<red>", "\033[31m");
-    s = s.replace("</red>", "\033[0m");
-    s = s.replace("<green>", "\033[32m");
-    s = s.replace("</green>", "\033[0m");
-    s = s.replace("<brown>", "\033[33m");
-    s = s.replace("</brown>", "\033[0m");
-    s = s.replace("<blue>", "\033[34m");
-    s = s.replace("</blue>", "\033[0m");
-    s = s.replace("<magenta>", "\033[35m");
-    s = s.replace("</magenta>", "\033[0m");
-    s = s.replace("<cyan>", "\033[36m");
-    s = s.replace("</cyan>", "\033[0m");
-    s = s.replace("<lgrey>", "\033[37m");
-    s = s.replace("</lgrey>", "\033[0m");
-    s = s.replace("<grey>", "\033[90m");
-    s = s.replace("</grey>", "\033[0m");
-    s = s.replace("<lred>", "\033[91m");
-    s = s.replace("</lred>", "\033[0m");
-    s = s.replace("<lgreen>", "\033[92m");
-    s = s.replace("</lgreen>", "\033[0m");
-    s = s.replace("<yellow>", "\033[93m");
-    s = s.replace("</yellow>", "\033[0m");
-    s = s.replace("<lblue>", "\033[94m");
-    s = s.replace("</lblue>", "\033[0m");
-    s = s.replace("<lmagenta>", "\033[95m");
-    s = s.replace("</lmagenta>", "\033[0m");
-    s = s.replace("<lcyan>", "\033[96m");
-    s = s.replace("</lcyan>", "\033[0m");
-    s = s.replace("<white>", "\033[97m");
-    s = s.replace("</white>", "\033[0m");
-    
-/*
-    "black",  "red",  "green",  "brown",  "blue",  "magenta", "cyan", "lgrey", 
-        "grey", "lred", "lgreen", "yellow", "lblue", "lmagenta", "lcyan", "white"*/
+    // Most general instance
+    cwrite(args, '\n');
+}
 
-    return s;
+///ditto
+void cwritef(Char, T...)(in Char[] fmt, T args)
+{
+    import std.string : format;
+    auto s = format(fmt, args);
+    cwrite(s);
+}
+
+///ditto
+void cwritefln(Char, T...)(in Char[] fmt, T args)
+{
+    cwritef(fmt ~ "\n", args);
 }
 
     
@@ -238,12 +181,17 @@ private:
 enum int CC_ERR_OK = 0,           // "<blue>text</blue>"
          CC_UNTERMINATED_TAG = 1, // "<blue"
          CC_UNKNOWN_TAG = 2,      // "<pink>text</pink>"
-         CC_MISMATCHED_TAG = 3;   // "<blue>text</red>"
+         CC_MISMATCHED_TAG = 3,   // "<blue>text</red>"
+         CC_TERMINAL_ERROR = 4;   // terminal.d error.
 
 // Implementation of `emitToTerminal`. This is a combined lexer/parser/emitter.
 // It can throw Exception in case of misformat of the input text.
-int emitToTerminal(scope FILE* cfile, const(char)[] s) nothrow @nogc @safe
+int emitToTerminal( const(char)[] s) @trusted
 {
+    TermInterpreter* term = &g_termInterpreter;
+    return term.interpret(s);
+    /*
+
     version(Windows)
     {
         WinTermEmulation winterm;
@@ -262,158 +210,141 @@ int emitToTerminal(scope FILE* cfile, const(char)[] s) nothrow @nogc @safe
     else
     {
         fwrite(cfile, s);
-    }
-    return CC_ERR_OK;
+    }*/
+//   return CC_ERR_OK;
 }
 
+private:
 
-version(Windows)
+/// A global, shared state machine that does the terminal emulation and book-keeping.
+TermInterpreter g_termInterpreter = TermInterpreter.init;
+
+shared static this()
 {
-    import core.sys.windows.windows;
+    g_termInterpreter.initialize();
+}
 
-    // This is a state machine to enable terminal colors on Windows.
-    // Parses and interpret ANSI/VT100 Terminal Control Escape Sequences.
-    // Only supports colour sequences, will output char incorrectly on invalid input.
-    struct WinTermEmulation
+shared static ~this()
+{
+}
+
+struct TermInterpreter
+{
+    void initialize()
     {
-    public:
-        @nogc void initialize() nothrow @trusted
+        if (Terminal.stdoutIsTerminal)
         {
-            // saves console attributes
-            _console = GetStdHandle(STD_OUTPUT_HANDLE);
-            _savedInitialColor = (0 != GetConsoleScreenBufferInfo(_console, &consoleInfo));
-            _state = State.initial;
+            _terminal = Terminal(ConsoleOutputType.linear);
+            _enableTerm = true;
         }
+    }
 
-        @nogc ~this() nothrow @trusted
+    void disableColors()
+    {
+        _enableTerm = false;
+    }
+
+    /// Moves the interpreter forward, eventually do actions.
+    /// Return: error code.
+    int interpret(const(char)[] s)
+    {
+        // Init tag stack.
+        // State is reset between all calls to interpret, so that errors can be eaten out.
+
+        bool finished = false;
+        bool termTextWasOutput = false;
+        while(!finished)
         {
-            // Restore initial text attributes on release
-            if (_savedInitialColor)
+            final switch (_parserState)
             {
-                SetConsoleTextAttribute(_console, consoleInfo.wAttributes);
-                _savedInitialColor = false;
-            }
-        }
+                case ParserState.initial:
 
-        enum CharAction
-        {
-            write,
-            drop,
-            flush
-        }
-
-        // Eat one character and update color state accordingly.
-        // Returns what to do with the fed character.
-        @nogc CharAction feed(dchar d) nothrow @trusted
-        {
-            final switch(_state) with (State)
-            {
-                case initial:
-                    if (d == '\x1B')
+                    Token token = getNextToken();
+                    final switch(token.type)
                     {
-                        _state = escaped;
-                        return CharAction.flush;
-                    }
-                    break;
+                        case TokenType.tag:
 
-                case escaped:
-                    if (d == '[')
-                    {
-                        _state = readingAttribute;
-                        _parsedAttr = 0;
-                        return CharAction.drop;
-                    }
-                    break;
-
-
-                case readingAttribute:
-                    if (d >= '0' && d <= '9')
-                    {
-                        _parsedAttr = _parsedAttr * 10 + (d - '0');
-                        return CharAction.drop;
-                    }
-                    else if (d == ';')
-                    {
-                        executeAttribute(_parsedAttr);
-                        _parsedAttr = 0;
-                        return CharAction.drop;
-                    }
-                    else if (d == 'm')
-                    {
-                        executeAttribute(_parsedAttr);
-                        _state = State.initial;
-                        return CharAction.drop;
-                    }
-                    break;
-            }
-            return CharAction.write;
-        }
-
-    private:
-        HANDLE _console;
-        bool _savedInitialColor;
-        CONSOLE_SCREEN_BUFFER_INFO consoleInfo;
-        State _state;
-        WORD _currentAttr;
-        int _parsedAttr;
-
-        enum State
-        {
-            initial,
-            escaped,
-            readingAttribute
-        }
-
-        @nogc void setForegroundColor(WORD fgFlags) nothrow @trusted
-        {
-            _currentAttr = _currentAttr & ~(FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_RED | FOREGROUND_INTENSITY);
-            _currentAttr = _currentAttr | fgFlags;
-            SetConsoleTextAttribute(_console, _currentAttr);
-        }
-
-        @nogc void setBackgroundColor(WORD bgFlags) nothrow @trusted
-        {
-            _currentAttr = _currentAttr & ~(BACKGROUND_BLUE | BACKGROUND_GREEN | BACKGROUND_RED | BACKGROUND_INTENSITY);
-            _currentAttr = _currentAttr | bgFlags;
-            SetConsoleTextAttribute(_console, _currentAttr);
-        }
-
-        @nogc void executeAttribute(int attr) nothrow @trusted
-        {
-            switch (attr)
-            {
-                case 0:
-                    // reset all attributes
-                    SetConsoleTextAttribute(_console, consoleInfo.wAttributes);
-                    break;
-
-                default:
-                    if ( (30 <= attr && attr <= 37) || (90 <= attr && attr <= 97) )
-                    {
-                        WORD color = 0;
-                        if (90 <= attr && attr <= 97)
+                        case TokenType.text:
                         {
-                            color = FOREGROUND_INTENSITY;
-                            attr -= 60;
+                            if (_enableTerm)
+                            {
+                                try
+                                {
+                                    _terminal.write(token.text);
+                                }
+                                catch(Exception e)
+                                {
+                                    return CC_TERMINAL_ERROR;
+                                }
+                                termTextWasOutput = true;
+                            }
+                            else
+                            {
+                                stdout.write(token.text);
+                            }
+                            break;
                         }
-                        attr -= 30;
-                        color |= (attr & 1 ? FOREGROUND_RED : 0) | (attr & 2 ? FOREGROUND_GREEN : 0) | (attr & 4 ? FOREGROUND_BLUE : 0);
-                        setForegroundColor(color);
-                    }
 
-                    if ( (40 <= attr && attr <= 47) || (100 <= attr && attr <= 107) )
-                    {
-                        WORD color = 0;
-                        if (100 <= attr && attr <= 107)
-                        {
-                            color = BACKGROUND_INTENSITY;
-                            attr -= 60;
-                        }
-                        attr -= 40;
-                        color |= (attr & 1 ? BACKGROUND_RED : 0) | (attr & 2 ? BACKGROUND_GREEN : 0) | (attr & 4 ? BACKGROUND_BLUE : 0);
-                        setBackgroundColor(color);
+                        case TokenType.endOfInput:
+                            finished = true;
+                            break;
+
                     }
+                break;
             }
         }
+
+        if (termTextWasOutput)
+        {
+            _terminal.flush();
+        }
+
+        return 0;
+    }
+
+private:
+    bool _enableTerm = false;
+    Terminal _terminal;
+
+    ParserState _parserState = ParserState.initial;
+    enum ParserState
+    {
+        initial
+    }
+
+    static struct Tag
+    {
+        int type; // 0 = open   1 = closed   2 = open and closed
+        const(char)[] name; // tag name
+    }
+
+    enum TokenType
+    {
+        tag,
+        text,
+        endOfInput
+    }
+
+    static struct Token
+    {
+        TokenType type;
+
+        // name of tag, or text
+        const(char)[] text = null; 
+
+        // position in input text
+        int col = 0;
+    }
+
+    bool hasNextToken()
+    {
+        return false;
+    }
+
+    Token getNextToken()
+    {
+        Token tok;
+        tok.type = TokenType.endOfInput;
+        return tok;
     }
 }
