@@ -9,6 +9,6 @@ void main(string[] args)
 
     foreach(color; availableConsoleColors)
     {
-        cwritefln("<%s> - %s </%s>  &amp; &lt; &gt;", color, color, color);
+        cwritefln("<%s> - %s </%s> <grey>(with &lt;%s&gt; and &lt;on_%s&gt;)</grey>", color, color, color, color, color);
     }
 }

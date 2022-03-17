@@ -6,19 +6,27 @@
 */
 module consolecolors;
 
-import arsd.terminal;
-
-import core.stdc.stdio: FILE, fwrite, fflush, fputc;
+import core.stdc.stdio: printf, FILE, fwrite, fflush, fputc;
 import std.stdio : File, stdout;
 import std.string: format;
 
+private import consolecolors.term;
+
+// Some design consideration for this library:
+// - Low-hassle, it should work correctly, handle CTRL-C etc by itself.
+// - We assume full D runtime, not -betterC
+// - Takes over your namespace. Just provide .yellow and .on_yellow instead of a `color` function.
+// - Works with C stdlib file handles, not the terminal directly, so as to mix `cwrite` and `write`.
+// - 16 colors only + the "initial" one.
+// - because we give colors in HTML tags, `cwrite` need to take escaped < > and & with HTML entities.
+//   That's the only problem, I guess a markdown solution would also work.
 
 public:
 
 /// All available console colors for this library.
 static immutable string[16] availableConsoleColors =
 [
-    "black",  "red",  "green",  "brown",  "blue",  "magenta", "cyan", "lgrey", 
+    "black",  "red",  "green",  "orange",  "blue",  "magenta", "cyan", "lgrey", 
     "grey", "lred", "lgreen", "yellow", "lblue", "lmagenta", "lcyan", "white"
 ];
 
@@ -41,9 +49,9 @@ pure nothrow @safe
         return "<green>" ~ text ~ "</green>";
     }
     ///ditto
-    string brown(const(char)[] text)
+    string orange(const(char)[] text)
     {
-        return "<brown>" ~ text ~ "</brown>";
+        return "<orange>" ~ text ~ "</orange>";
     }
     ///ditto
     string blue(const(char)[] text)
@@ -121,7 +129,7 @@ string color(const(char)[] text, const(char)[] color) pure @safe
 /// 
 /// Accepted tags:
 /// - <COLORNAME> such as:
-///    <black>, <red>, <green>, <brown>, <blue>, <magenta>, <cyan>, <lgrey>, 
+///    <black>, <red>, <green>, <orange>, <blue>, <magenta>, <cyan>, <lgrey>, 
 ///    <grey>, <lred>, <lgreen>, <yellow>, <lblue>, <lmagenta>, <lcyan>, <white>
 /// 
 /// Escaping:
@@ -189,29 +197,7 @@ enum int CC_ERR_OK = 0,           // "<blue>text</blue>"
 int emitToTerminal( const(char)[] s) @trusted
 {
     TermInterpreter* term = &g_termInterpreter;
-    return term.interpret(s);
-    /*
-
-    version(Windows)
-    {
-        WinTermEmulation winterm;
-        winterm.initialize();
-        foreach(char ch ; s)
-        {
-            auto charAction = winterm.feed(ch);
-            final switch(charAction) with (WinTermEmulation.CharAction)
-            {
-                case drop: break;
-                case write: fputc(ch, cfile); break;
-                case flush: fflush(cfile); break;
-            }
-        }
-    }
-    else
-    {
-        fwrite(cfile, s);
-    }*/
-//   return CC_ERR_OK;
+    return term.interpret(s);  
 }
 
 private:
@@ -233,9 +219,9 @@ struct TermInterpreter
 {
     void initialize()
     {
-        if (Terminal.stdoutIsTerminal)
+        if (stdoutIsTerminal)
         {
-            _terminal = Terminal(ConsoleOutputType.linear);
+            _terminal.initialize();
             _enableTerm = true;
         }
     }
@@ -259,8 +245,11 @@ struct TermInterpreter
         input = s;
         inputPos = 0;
 
-        _tagStack[0] = Tag(Color.DEFAULT, Color.DEFAULT, "html");
-        _tagStackIndex = 1;
+        stack(0) = Tag(TermColor.unknown, TermColor.unknown, "html");
+        _tagStackIndex = 0;
+
+        setForeground(TermColor.initial);
+        setBackground(TermColor.initial);
 
         bool finished = false;
         bool termTextWasOutput = false;
@@ -294,22 +283,7 @@ struct TermInterpreter
 
                         case TokenType.text:
                         {
-                            if (_enableTerm)
-                            {
-                                try
-                                {
-                                    _terminal.write(token.text);
-                                }
-                                catch(Exception e)
-                                {
-                                    return CC_TERMINAL_ERROR;
-                                }
-                                termTextWasOutput = true;
-                            }
-                            else
-                            {
-                                stdout.write(token.text);
-                            }
+                            stdout.write(token.text);
                             break;
                         }
 
@@ -321,12 +295,6 @@ struct TermInterpreter
                 break;
             }
         }
-
-        if (termTextWasOutput)
-        {
-            _terminal.flush();
-        }
-
         return 0;
     }
 
@@ -334,20 +302,27 @@ private:
     bool _enableTerm = false;
     Terminal _terminal;
 
-    Color _bg = Color.DEFAULT;
-    Color _fg = Color.DEFAULT;
-
     // Style/Tag stack
     static struct Tag
     {
-        int fg;  // last applied foreground color
-        int bg;  // last applied background color
+        TermColor fg = TermColor.unknown;  // last applied foreground color
+        TermColor bg = TermColor.unknown;  // last applied background color
         const(char)[] name; // last applied tag
     }
     enum int MAX_NESTED_TAGS = 32;
 
-    Tag[MAX_NESTED_TAGS] _tagStack;
+    Tag[MAX_NESTED_TAGS] _stack;
     int _tagStackIndex;
+
+    ref Tag stack(int index) return
+    {
+        return _stack[index];
+    }
+
+    ref Tag stackTop() return
+    {
+        return _stack[_tagStackIndex];
+    }
 
     void enterTag(const(char)[] tagName)
     {
@@ -355,60 +330,83 @@ private:
             throw new Exception("Tag stack is full, internal error of console-colors");
 
         // dup top of stack, set foreground color
-        _tagStack[_tagStackIndex + 1] = _tagStack[_tagStackIndex];
+        stack(_tagStackIndex + 1) = stack(_tagStackIndex);
         _tagStackIndex += 1;
-        _tagStack[_tagStackIndex].name = tagName;
+        stack(_tagStackIndex).name = tagName;
     
         switch(tagName)
         {
-            case "black":   setForeground(Color.black); break;
-            case "red":     setForeground(Color.red); break;
-            case "green":   setForeground(Color.green); break;
-            case "brown":   setForeground(Color.yellow); break;
-            case "blue":    setForeground(Color.blue); break;
-            case "magenta": setForeground(Color.magenta); break;
-            case "cyan":    setForeground(Color.cyan); break;
-            case "lgrey":   setForeground(Color.white); break;
-            case "grey":    setForeground(Color.black | Bright); break;
-            case "lred":    setForeground(Color.red | Bright); break;
-            case "lgreen":  setForeground(Color.green | Bright); break;
-            case "yellow":  setForeground(Color.yellow | Bright); break;
-            case "lblue":   setForeground(Color.blue | Bright); break;
-            case "lmagenta":setForeground(Color.magenta | Bright); break;
-            case "lcyan":   setForeground(Color.cyan | Bright); break;
-            case "white":   setForeground(Color.white | Bright); break;
+            case "black":   setForeground(TermColor.black); break;
+            case "red":     setForeground(TermColor.red); break;
+            case "green":   setForeground(TermColor.green); break;
+            case "orange":  setForeground(TermColor.orange); break;
+            case "blue":    setForeground(TermColor.blue); break;
+            case "magenta": setForeground(TermColor.magenta); break;
+            case "cyan":    setForeground(TermColor.cyan); break;
+            case "lgrey":   setForeground(TermColor.lgrey); break;
+            case "grey":    setForeground(TermColor.grey); break;
+            case "lred":    setForeground(TermColor.lred); break;
+            case "lgreen":  setForeground(TermColor.lgreen); break;
+            case "yellow":  setForeground(TermColor.yellow); break;
+            case "lblue":   setForeground(TermColor.lblue); break;
+            case "lmagenta":setForeground(TermColor.lmagenta); break;
+            case "lcyan":   setForeground(TermColor.lcyan); break;
+            case "white":   setForeground(TermColor.white); break;
             default:
                 break; // unknown tag
         }
     }
 
-    void setForeground(int fg)
+    void setForeground(TermColor fg)
     {
-        if (_tagStack[_tagStackIndex].fg != fg)
-        {
-            _tagStack[_tagStackIndex].fg = fg;
-            applyStyleOnTop();
-        }
+        assert(fg != TermColor.unknown);
+        stackTop().fg = fg;
+        if (_enableTerm)
+            _terminal.setForegroundColor(stackTop().fg);
+    }
+
+    void setBackground(TermColor bg)
+    {
+        assert(bg != TermColor.unknown);
+        stackTop().bg = bg;
+        if (_enableTerm)
+            _terminal.setBackgroundColor(stackTop().bg);
     }
 
     void applyStyleOnTop()
     {
         if (_enableTerm)
         {
-            _terminal.color(_tagStack[_tagStackIndex].fg, _tagStack[_tagStackIndex].bg);
+            _terminal.setForegroundColor(stackTop().fg);
+            _terminal.setBackgroundColor(stackTop().bg);
         }
     }
+
+    /*
+    void debugPrintStack()
+    {
+        import std.stdio;
+        writeln("Stack state");
+        for (int n = 0; n <= _tagStackIndex; ++n)
+        {
+            import std.stdio;
+            writefln("tag %s   fg = %s  bg = %s",
+                     _stack[_tagStackIndex].name, _stack[_tagStackIndex].fg, _stack[_tagStackIndex].bg);
+        }
+        writeln;
+    }
+    */
 
     void exitTag(const(char)[] tagName)
     {
         if (_tagStackIndex <= 0)
             throw new Exception("Unexpected closing tag");
         
-        if (_tagStack[_tagStackIndex].name != tagName)
+        if (stackTop().name != tagName)
             throw new Exception("Closing tag mismatch");
 
         // drop one state of stack, apply old style
-        _tagStackIndex -= 1;
+        _tagStackIndex -= 1;        
         applyStyleOnTop();
     }
 
