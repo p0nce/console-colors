@@ -223,6 +223,7 @@ struct TermInterpreter
         {
             _terminal.initialize();
             _enableTerm = true;
+            cstdout = stdout.getFP();
         }
     }
 
@@ -283,7 +284,7 @@ struct TermInterpreter
 
                         case TokenType.text:
                         {
-                            stdout.write(token.text);
+                            printf("%.*s", cast(int)token.text.length, token.text.ptr);
                             break;
                         }
 
@@ -302,6 +303,8 @@ private:
     bool _enableTerm = false;
     Terminal _terminal;
 
+    FILE* cstdout;
+
     // Style/Tag stack
     static struct Tag
     {
@@ -314,12 +317,12 @@ private:
     Tag[MAX_NESTED_TAGS] _stack;
     int _tagStackIndex;
 
-    ref Tag stack(int index) return
+    ref Tag stack(int index) nothrow @nogc return
     {
         return _stack[index];
     }
 
-    ref Tag stackTop() return
+    ref Tag stackTop() nothrow @nogc return
     {
         return _stack[_tagStackIndex];
     }
@@ -333,55 +336,67 @@ private:
         stack(_tagStackIndex + 1) = stack(_tagStackIndex);
         _tagStackIndex += 1;
         stack(_tagStackIndex).name = tagName;
+
+        bool bg = false;
+        if ((tagName.length >= 3) && (tagName[0..3] == "on_"))
+        {
+            tagName = tagName[3..$];
+            bg = true;
+        }       
     
         switch(tagName)
         {
-            case "black":   setForeground(TermColor.black); break;
-            case "red":     setForeground(TermColor.red); break;
-            case "green":   setForeground(TermColor.green); break;
-            case "orange":  setForeground(TermColor.orange); break;
-            case "blue":    setForeground(TermColor.blue); break;
-            case "magenta": setForeground(TermColor.magenta); break;
-            case "cyan":    setForeground(TermColor.cyan); break;
-            case "lgrey":   setForeground(TermColor.lgrey); break;
-            case "grey":    setForeground(TermColor.grey); break;
-            case "lred":    setForeground(TermColor.lred); break;
-            case "lgreen":  setForeground(TermColor.lgreen); break;
-            case "yellow":  setForeground(TermColor.yellow); break;
-            case "lblue":   setForeground(TermColor.lblue); break;
-            case "lmagenta":setForeground(TermColor.lmagenta); break;
-            case "lcyan":   setForeground(TermColor.lcyan); break;
-            case "white":   setForeground(TermColor.white); break;
+            case "black":   setColor(TermColor.black,  bg); break;
+            case "red":     setColor(TermColor.red,    bg); break;
+            case "green":   setColor(TermColor.green,  bg); break;
+            case "orange":  setColor(TermColor.orange, bg); break;
+            case "blue":    setColor(TermColor.blue,   bg); break;
+            case "magenta": setColor(TermColor.magenta,bg); break;
+            case "cyan":    setColor(TermColor.cyan,   bg); break;
+            case "lgrey":   setColor(TermColor.lgrey,  bg); break;
+            case "grey":    setColor(TermColor.grey,   bg); break;
+            case "lred":    setColor(TermColor.lred,   bg); break;
+            case "lgreen":  setColor(TermColor.lgreen, bg); break;
+            case "yellow":  setColor(TermColor.yellow, bg); break;
+            case "lblue":   setColor(TermColor.lblue,  bg); break;
+            case "lmagenta":setColor(TermColor.lmagenta,bg); break;
+            case "lcyan":   setColor(TermColor.lcyan,  bg); break;
+            case "white":   setColor(TermColor.white,  bg); break;
             default:
                 break; // unknown tag
         }
     }
 
-    void setForeground(TermColor fg)
+    void setColor(TermColor c, bool bg) nothrow @nogc
     {
-        assert(fg != TermColor.unknown);
-        stackTop().fg = fg;
-        if (_enableTerm)
-            _terminal.setForegroundColor(stackTop().fg);
+        if (bg) setBackground(c);
+        else setForeground(c);
     }
 
-    void setBackground(TermColor bg)
+    void setForeground(TermColor fg) nothrow @nogc
     {
-        assert(bg != TermColor.unknown);
+        stackTop().fg = fg;
+        if (_enableTerm)
+            _terminal.setForegroundColor(stackTop().fg, &flushStdoutIfWindows);
+    }
+
+    void setBackground(TermColor bg) nothrow @nogc
+    {
         stackTop().bg = bg;
         if (_enableTerm)
-            _terminal.setBackgroundColor(stackTop().bg);
+            _terminal.setBackgroundColor(stackTop().bg, &flushStdoutIfWindows);
     }
 
     void applyStyleOnTop()
     {
         if (_enableTerm)
         {
-            _terminal.setForegroundColor(stackTop().fg);
-            _terminal.setBackgroundColor(stackTop().bg);
+            // PERF: do this at once.
+            _terminal.setForegroundColor(stackTop().fg, &flushStdoutIfWindows);
+            _terminal.setBackgroundColor(stackTop().bg, &flushStdoutIfWindows);
         }
     }
-
+    
     /*
     void debugPrintStack()
     {
@@ -396,6 +411,7 @@ private:
         writeln;
     }
     */
+
 
     void exitTag(const(char)[] tagName)
     {
@@ -476,6 +492,17 @@ private:
     void next()
     {
         inputPos += 1;
+    }
+
+    void flushStdoutIfWindows() nothrow @nogc
+    {
+        version(Windows)
+        {
+            //  On windows, because the C stdlib is buffered, we need to flush()
+            //  before changing color else text is going to be the next color.
+            if (cstdout != null)
+                fflush(cstdout);
+        }
     }
 
     Token getNextToken()

@@ -89,8 +89,8 @@ struct Terminal
         {            
             if (_savedInitialColor)
             {
-                setForegroundColor(_initialForegroundColor);
-                setBackgroundColor(_initialBackgroundColor);
+                setForegroundColor(_initialForegroundColor, null);
+                setBackgroundColor(_initialBackgroundColor, null);
                 _savedInitialColor = false;
             }
         }
@@ -101,7 +101,8 @@ struct Terminal
             static assert(false);
     }
 
-    void setForegroundColor(TermColor color) @trusted
+    void setForegroundColor(TermColor color, 
+                            scope void delegate() nothrow @nogc callThisBeforeChangingColor  ) @trusted
     {
         assert(color != TermColor.unknown);
 
@@ -109,6 +110,8 @@ struct Terminal
             return;
         _currentForegroundColor = color;
 
+        if (callThisBeforeChangingColor)
+            callThisBeforeChangingColor();
         version(Windows)
         {
             WORD attr = cast(WORD)( (_currentAttr & ~FOREGROUND_MASK) | convertTermColorToWinAttr(color, false) );
@@ -122,7 +125,7 @@ struct Terminal
             static assert(false);
     }
 
-    void setBackgroundColor(TermColor color) @trusted
+    void setBackgroundColor(TermColor color, scope void delegate() nothrow @nogc callThisBeforeChangingColor) @trusted
     {
         assert(color != TermColor.unknown);
 
@@ -130,6 +133,8 @@ struct Terminal
             return;
         _currentForegroundColor = color;
 
+        if (callThisBeforeChangingColor)
+            callThisBeforeChangingColor();
         version(Windows)
         {
             WORD attr = cast(WORD)( (_currentAttr & ~BACKGROUND_MASK) | (convertTermColorToWinAttr(color, true)) );
