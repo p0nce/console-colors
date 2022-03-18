@@ -13,12 +13,12 @@ import std.string: format;
 private import consolecolors.term;
 
 // Some design consideration for this library:
-// - Low-hassle, it should work correctly, handle CTRL-C etc by itself.
-// - We assume full D runtime, not -betterC
-// - Takes over your namespace. Just provide .yellow and .on_yellow instead of a `color` function.
-// - Works with C stdlib file handles, not the terminal directly, so as to mix `cwrite` and `write`.
-// - 16 colors only + the "initial" one.
-// - because we give colors in HTML tags, `cwrite` need to take escaped < > and & with HTML entities.
+// - [ ] Low-hassle, it should work correctly, handle CTRL-C etc by itself.
+// - [x] We assume full D runtime, not -betterC
+// - [x] Takes over your namespace. Just provide .yellow and .on_yellow instead of a `color` function.
+// - [x] Works with C stdlib file handles, not the terminal directly, so as to mix `cwrite` and `write`.
+// - [x] 16 colors only.
+// - [x] because we give colors in HTML tags, `cwrite` need to take escaped < > and & with HTML entities.
 //   That's the only problem, I guess a markdown solution would also work.
 
 public:
@@ -112,6 +112,88 @@ pure nothrow @safe
     string white(const(char)[] text)
     {
         return "<white>" ~ text ~ "</white>";
+    }
+
+    /// Change background color of the text.
+    /// This wraps the text around, for consumption into `cwrite` or equivalent.
+    string on_black(const(char)[] text)
+    {
+        return "<on_black>" ~ text ~ "</on_black>";
+    }
+    ///ditto
+    string on_red(const(char)[] text)
+    {
+        return "<on_red>" ~ text ~ "</on_red>";
+    }
+    ///ditto
+    string on_green(const(char)[] text)
+    {
+        return "<on_green>" ~ text ~ "</on_green>";
+    }
+    ///ditto
+    string on_orange(const(char)[] text)
+    {
+        return "<on_orange>" ~ text ~ "</on_orange>";
+    }
+    ///ditto
+    string on_blue(const(char)[] text)
+    {
+        return "<on_blue>" ~ text ~ "</on_blue>";
+    }
+    ///ditto
+    string on_magenta(const(char)[] text)
+    {
+        return "<on_magenta>" ~ text ~ "</on_magenta>";
+    }
+    ///ditto
+    string on_cyan(const(char)[] text)
+    {
+        return "<on_cyan>" ~ text ~ "</on_cyan>";
+    }
+    ///ditto
+    string on_lgrey(const(char)[] text)
+    {
+        return "<on_lgrey>" ~ text ~ "</on_lgrey>";
+    }
+    ///ditto
+    string on_grey(const(char)[] text)
+    {
+        return "<on_grey>" ~ text ~ "</on_grey>";
+    }
+    ///ditto
+    string on_lred(const(char)[] text)
+    {
+        return "<on_lred>" ~ text ~ "</on_lred>";
+    }
+    ///ditto
+    string on_lgreen(const(char)[] text)
+    {
+        return "<on_lgreen>" ~ text ~ "</on_lgreen>";
+    }
+    ///ditto
+    string on_yellow(const(char)[] text)
+    {
+        return "<on_yellow>" ~ text ~ "</on_yellow>";
+    }
+    ///ditto
+    string on_lblue(const(char)[] text)
+    {
+        return "<on_lblue>" ~ text ~ "</on_lblue>";
+    }
+    ///ditto
+    string on_lmagenta(const(char)[] text)
+    {
+        return "<on_lmagenta>" ~ text ~ "</on_lmagenta>";
+    }
+    ///ditto
+    string on_lcyan(const(char)[] text)
+    {
+        return "<on_lcyan>" ~ text ~ "</on_lcyan>";
+    }
+    ///ditto
+    string on_white(const(char)[] text)
+    {
+        return "<on_white>" ~ text ~ "</on_white>";
     }
 }
 
