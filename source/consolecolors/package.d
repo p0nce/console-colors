@@ -333,9 +333,10 @@ private:
             throw new Exception("Tag stack is full, internal error of console-colors");
 
         // dup top of stack, set foreground color
-        stack(_tagStackIndex + 1) = stack(_tagStackIndex);
+        _stack[_tagStackIndex + 1] = _stack[_tagStackIndex]; 
+        _stack[_tagStackIndex + 1].name = tagName; // Note: this name doesn't outlive the line of text we write
+
         _tagStackIndex += 1;
-        stack(_tagStackIndex).name = tagName;
 
         bool bg = false;
         if ((tagName.length >= 3) && (tagName[0..3] == "on_"))

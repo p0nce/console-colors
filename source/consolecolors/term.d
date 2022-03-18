@@ -106,6 +106,9 @@ struct Terminal
     {
         assert(color != TermColor.unknown);
 
+        if (color == TermColor.initial)
+            color = _initialForegroundColor;
+
         if (_currentForegroundColor == color)
             return;
         _currentForegroundColor = color;
@@ -128,6 +131,9 @@ struct Terminal
     void setBackgroundColor(TermColor color, scope void delegate() nothrow @nogc callThisBeforeChangingColor) @trusted
     {
         assert(color != TermColor.unknown);
+
+        if (color == TermColor.initial)
+            color = _initialBackgroundColor;
 
         if (_currentForegroundColor == color)
             return;
