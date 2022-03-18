@@ -1,1 +1,0 @@
-- if stdout is not console, disable Windows things

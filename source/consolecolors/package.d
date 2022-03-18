@@ -20,6 +20,7 @@ private import consolecolors.term;
 // - [x] 16 colors only.
 // - [x] because we give colors in HTML tags, `cwrite` need to take escaped < > and & with HTML entities.
 //   That's the only problem, I guess a markdown solution would also work.
+// - [x] Ability to disable colors globally with a call.
 
 public:
 
@@ -263,6 +264,12 @@ void cwritefln(Char, T...)(in Char[] fmt, T args)
     cwritef(fmt ~ "\n", args);
 }
 
+/// Disable output console colors.
+void disableConsoleColors()
+{
+    g_termInterpreter.disableColors();
+}
+
     
 // PRIVATE PARTS API START HERE
 private:
@@ -303,9 +310,11 @@ struct TermInterpreter
     {
         if (stdoutIsTerminal)
         {
-            _terminal.initialize();
-            _enableTerm = true;
-            cstdout = stdout.getFP();
+            if (_terminal.initialize())
+            {
+                _enableTerm = true;
+                cstdout = stdout.getFP();
+            }
         }
     }
 
@@ -429,22 +438,22 @@ private:
     
         switch(tagName)
         {
-            case "black":   setColor(TermColor.black,  bg); break;
-            case "red":     setColor(TermColor.red,    bg); break;
-            case "green":   setColor(TermColor.green,  bg); break;
-            case "orange":  setColor(TermColor.orange, bg); break;
-            case "blue":    setColor(TermColor.blue,   bg); break;
-            case "magenta": setColor(TermColor.magenta,bg); break;
-            case "cyan":    setColor(TermColor.cyan,   bg); break;
-            case "lgrey":   setColor(TermColor.lgrey,  bg); break;
-            case "grey":    setColor(TermColor.grey,   bg); break;
-            case "lred":    setColor(TermColor.lred,   bg); break;
-            case "lgreen":  setColor(TermColor.lgreen, bg); break;
-            case "yellow":  setColor(TermColor.yellow, bg); break;
-            case "lblue":   setColor(TermColor.lblue,  bg); break;
-            case "lmagenta":setColor(TermColor.lmagenta,bg); break;
-            case "lcyan":   setColor(TermColor.lcyan,  bg); break;
-            case "white":   setColor(TermColor.white,  bg); break;
+            case "black":    setColor(TermColor.black,  bg); break;
+            case "red":      setColor(TermColor.red,    bg); break;
+            case "green":    setColor(TermColor.green,  bg); break;
+            case "orange":   setColor(TermColor.orange, bg); break;
+            case "blue":     setColor(TermColor.blue,   bg); break;
+            case "magenta":  setColor(TermColor.magenta,bg); break;
+            case "cyan":     setColor(TermColor.cyan,   bg); break;
+            case "lgrey":    setColor(TermColor.lgrey,  bg); break;
+            case "grey":     setColor(TermColor.grey,   bg); break;
+            case "lred":     setColor(TermColor.lred,   bg); break;
+            case "lgreen":   setColor(TermColor.lgreen, bg); break;
+            case "yellow":   setColor(TermColor.yellow, bg); break;
+            case "lblue":    setColor(TermColor.lblue,  bg); break;
+            case "lmagenta": setColor(TermColor.lmagenta,bg); break;
+            case "lcyan":    setColor(TermColor.lcyan,  bg); break;
+            case "white":    setColor(TermColor.white,  bg); break;
             default:
                 break; // unknown tag
         }

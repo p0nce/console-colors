@@ -49,21 +49,24 @@ struct Terminal
     nothrow @nogc @safe:
 
     // Initialize the terminal.
-    // TODO: report error as error code in initialize, means it doesn't need destruction either.
-    void initialize() @trusted
+    // Return: success. If false, don't use this instance.
+    bool initialize() @trusted
     {
         version(Posix) 
         {
+            return true;
         }
         else version(Windows)
         {
             // saves console attributes
             _console = GetStdHandle(STD_OUTPUT_HANDLE);
+            if (_console == null)
+                return false;
 
+            /*
             CONSOLE_SCREEN_BUFFER_INFO consoleInfo;
-            if (GetConsoleScreenBufferInfo(_console, &consoleInfo) != 0)
+            if (_console && GetConsoleScreenBufferInfo(_console, &consoleInfo) != 0)
             {
-                _savedInitialColor = true;
                 _currentAttr = consoleInfo.wAttributes;
 
                 _initialForegroundColor = convertWinattrToTermColor(_currentAttr, false);
@@ -71,12 +74,10 @@ struct Terminal
 
                 _currentForegroundColor = _initialForegroundColor;
                 _currentBackgroundColor = _initialBackgroundColor;
+                return true;
             }
-            else
-            {
-                _savedInitialColor = false;
-                assert(false); // this whole path needs testing
-            }
+            else */
+                return false;
         }
         else
             static assert(false);
@@ -84,15 +85,15 @@ struct Terminal
 
     ~this()
     {
-        // Restore initial text attributes on release
+        // Note that this is also destructed if constructor failed (.init)
+        // so have to handle it anyway like most D objects.
+        if (!_initialized)
+            return;
+
         version(Windows)
         {            
-            if (_savedInitialColor)
-            {
-                setForegroundColor(_initialForegroundColor, null);
-                setBackgroundColor(_initialBackgroundColor, null);
-                _savedInitialColor = false;
-            }
+            setForegroundColor(_initialForegroundColor, null);
+            setBackgroundColor(_initialBackgroundColor, null);
         }
         else version(Posix)
         {
@@ -156,11 +157,12 @@ struct Terminal
 
 private:
 
+    // Successfully initialized.
+    bool _initialized = false;
+
     // At initialization, find those.
     TermColor _initialForegroundColor = TermColor.unknown;
     TermColor _initialBackgroundColor = TermColor.unknown;
-
-    bool _savedInitialColor; // if we need to restore those in destructor.
 
     // Act as cache to avoid useless syscalls.
     TermColor _currentForegroundColor = TermColor.unknown;
