@@ -170,9 +170,8 @@ private:
     {
         HANDLE _console;   // console handle.
         WORD _currentAttr; // Last known cached console attribute.
+        CONSOLE_SCREEN_BUFFER_INFO consoleInfo;
     }
-    
-    CONSOLE_SCREEN_BUFFER_INFO consoleInfo;
 
     version(Windows)
     {
