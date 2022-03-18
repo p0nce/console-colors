@@ -62,8 +62,6 @@ struct Terminal
             _console = GetStdHandle(STD_OUTPUT_HANDLE);
             if (_console == null)
                 return false;
-
-            /*
             CONSOLE_SCREEN_BUFFER_INFO consoleInfo;
             if (_console && GetConsoleScreenBufferInfo(_console, &consoleInfo) != 0)
             {
@@ -76,7 +74,7 @@ struct Terminal
                 _currentBackgroundColor = _initialBackgroundColor;
                 return true;
             }
-            else */
+            else
                 return false;
         }
         else
@@ -136,9 +134,9 @@ struct Terminal
         if (color == TermColor.initial)
             color = _initialBackgroundColor;
 
-        if (_currentForegroundColor == color)
+        if (_currentBackgroundColor == color)
             return;
-        _currentForegroundColor = color;
+        _currentBackgroundColor = color;
 
         if (callThisBeforeChangingColor)
             callThisBeforeChangingColor();
