@@ -1,0 +1,2 @@
+- CTRL-C support
+- what to do with parsing errors? Can we remove entities completely? Backtrack or poisonned tokens?
