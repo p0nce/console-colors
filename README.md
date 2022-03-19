@@ -12,6 +12,8 @@ It is meant as a spiritual successor of the `colorize` [package](https://github.
 
 - Use 16 different colors in the terminal, for foreground and background.
 
+- One file, can be copied in your project.
+
 - Color information can be given in two ways:
    - Within text with easy-to-remember tags, such as `"my <blue> text is <red>coloured</red></blue>"`
      Syntax errors within these tags throw, for the moment.
