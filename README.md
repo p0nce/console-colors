@@ -1,8 +1,16 @@
 # console-colors
 
+
+## Goals
+
 `console-colors` is an attempt towards making the **ultimate no-hassle console color library for D.**
 
 It is meant as a spiritual successor of the `colorize` [package](https://github.com/yamadapc/d-colorize) and improves it based upon usage on a few areas.
+
+
+## Features
+
+- Use 16 different colors in the terminal, for foreground and background.
 
 - Color information can be given in two ways:
    - Within text with easy-to-remember tags, such as `"my <blue> text is <red>coloured</red></blue>"`
