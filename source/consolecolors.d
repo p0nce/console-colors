@@ -683,14 +683,14 @@ nothrow @nogc @safe:
         if (!_initialized)
             return;
 
-        version(Windows)
+        version(Posix)
+        {
+            printf("\x1B[0m");
+        }
+        else version(Windows)
         {            
             setForegroundColor(_initialForegroundColor, null);
             setBackgroundColor(_initialBackgroundColor, null);
-        }
-        else version(Posix)
-        {
-            printf("\x1B[0m");
         }
         else
             static assert(false);
@@ -710,16 +710,16 @@ nothrow @nogc @safe:
 
         if (callThisBeforeChangingColor)
             callThisBeforeChangingColor();
-        version(Windows)
+        version(Posix)
+        {
+            int code = convertTermColorToVT100Attr(color, false);
+            printf("\x1B[%dm", code);
+        }
+        else version(Windows)
         {
             WORD attr = cast(WORD)( (_currentAttr & ~FOREGROUND_MASK) | convertTermColorToWinAttr(color, false) );
             SetConsoleTextAttribute(_console, attr);
             _currentAttr = attr;
-        }
-        else version(Posix)
-        {
-            int code = convertTermColorToVT100Attr(color, false);
-            printf("\x1B[%dm", code);
         }
         else
             static assert(false);
@@ -738,16 +738,16 @@ nothrow @nogc @safe:
 
         if (callThisBeforeChangingColor)
             callThisBeforeChangingColor();
-        version(Windows)
+        version(Posix)
+        {
+            int code = convertTermColorToVT100Attr(color, true);
+            printf("\x1B[%dm", code);
+        }
+        else version(Windows)
         {
             WORD attr = cast(WORD)( (_currentAttr & ~BACKGROUND_MASK) | (convertTermColorToWinAttr(color, true)) );
             SetConsoleTextAttribute(_console, attr);
             _currentAttr = attr;
-        }
-        else version(Posix)
-        {
-            int code = convertTermColorToVT100Attr(color, true);
-            printf("\x1B[%dm", code);
         }
         else
             static assert(false);

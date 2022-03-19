@@ -2,13 +2,17 @@
 
 `console-colors` is an attempt towards making the **ultimate no-hassle console color library for D.**
 
+It is meant as a spiritual successor of the `colorize` [package](https://github.com/yamadapc/d-colorize) and improves it based upon usage on a few areas.
+
 - Color information can be given in two ways:
-   - Within text with HTML-like tags, such as `"my <blue> text is <red>coloured</red></blue>"`
+   - Within text with easy-to-remember tags, such as `"my <blue> text is <red>coloured</red></blue>"`
+     Syntax errors within these tags throw, for the moment.
    - with string helper UFCS functions, such as `("my" ~ ("text is " ~ coloured.red)).blue`
 
 - Portable (Unix, Windows) with a special `cwrite[f][ln]` call, like the `colorize` package.
   Indeed, color information need to be **inline within text**, to properly nest in format strings.
-  All colors have an easy shortcut like `.lyellow` or `.red`.
+
+- All colors have an easy shortcut like `.lyellow` or `.red`, making it easier to add color in the first place (at the cost of your namespace).
 
   ```d
   try
@@ -22,8 +26,8 @@
   ```
 
 - Colors can be disabled globally, with `disableConsoleColors()`.
-  They are also disabled if `stdout` isn't a terminal, or if the terminal initialization failed.
-
+  It is an often wanted thing in command-line tools with colors.
+  Colors are also disabled if `stdout` isn't a terminal, or if the terminal initialization failed.
 
 
 We are heading towards the ultimate console in D. Reaching for the stars here.
