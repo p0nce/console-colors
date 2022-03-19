@@ -17,16 +17,16 @@
   }
   catch(Exception e)
   {
-      cwritefln("<lred>error:</lred> <white>%s</white>", escapeHTML(e.msg));
+      cwritefln("<lred>error:</lred> <white>%s</white>", e.msg);
   }
+  ```
 
-- Colors can be disabled globally, with 
-  They are also disabled if `stdout` isn't a terminal.
+- Colors can be disabled globally, with `disableConsoleColors()`.
+  They are also disabled if `stdout` isn't a terminal, or if the terminal initialization failed.
 
 
-- Support CTRL-C / CTRL-Z etc.
 
-Towards the ultimate console cWe are reaching for the stars here.
+We are heading towards the ultimate console in D. Reaching for the stars here.
 You have no excuse anymore not to have colors in your terminal.
 
 

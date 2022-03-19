@@ -1,7 +1,9 @@
 /**
-* Main API file. Define the main symbols cwrite[f][ln], and color functions.
+* Console colors library. Define the main symbols cwrite[f][ln], and color functions.
 *
 * Copyright: Guillaume Piolat 2014-2022.
+* Copyright: Adam D. Ruppe 2013-2022.
+* Copyright: Robert Pasiński 2012-2013.
 * License:   $(LINK2 http://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
 */
 module consolecolors;
@@ -9,196 +11,93 @@ module consolecolors;
 import core.stdc.stdio: printf, FILE, fwrite, fflush, fputc;
 import std.stdio : File, stdout;
 import std.string: format;
-
-private import consolecolors.term;
-
-// Some design consideration for this library:
-// - [ ] Low-hassle, it should work correctly, handle CTRL-C etc by itself.
-// - [x] We assume full D runtime, not -betterC
-// - [x] Takes over your namespace. Just provide .yellow and .on_yellow instead of a `color` function.
-// - [x] Works with C stdlib file handles, not the terminal directly, so as to mix `cwrite` and `write`.
-// - [x] 16 colors only.
-// - [x] because we give colors in HTML tags, `cwrite` need to take escaped < > and & with HTML entities.
-//   That's the only problem, I guess a markdown solution would also work.
-// - [x] Ability to disable colors globally with a call.
+version(Windows) import core.sys.windows.windows;
+version(Posix) import core.sys.posix.unistd;
 
 public:
 
-/// All available console colors for this library.
-static immutable string[16] availableConsoleColors =
-[
-    "black",  "red",  "green",  "orange",  "blue",  "magenta", "cyan", "lgrey", 
-    "grey", "lred", "lgreen", "yellow", "lblue", "lmagenta", "lcyan", "white"
-];
+/// Return all available console string colors for this library.
+string[] availableConsoleColors() pure nothrow @safe
+{
+    return [
+        "black",  "red",  "green",  "orange",  "blue",  "magenta", "cyan", "lgrey", 
+        "grey", "lred", "lgreen", "yellow", "lblue", "lmagenta", "lcyan", "white"
+    ];
+}
 
 pure nothrow @safe
 {
     /// Terminal colors functions. Change foreground color of the text.
     /// This wraps the text around, for consumption into `cwrite` or equivalent.
-    string black(const(char)[] text)
-    {
-        return "<black>" ~ text ~ "</black>";
-    }
+    string black(const(char)[] text)        { return "<black>" ~ text ~ "</black>";            }
     ///ditto
-    string red(const(char)[] text)
-    {
-        return "<red>" ~ text ~ "</red>";
-    }
+    string red(const(char)[] text)          { return "<red>" ~ text ~ "</red>";                }
     ///ditto
-    string green(const(char)[] text)
-    {
-        return "<green>" ~ text ~ "</green>";
-    }
+    string green(const(char)[] text)        { return "<green>" ~ text ~ "</green>";            }
     ///ditto
-    string orange(const(char)[] text)
-    {
-        return "<orange>" ~ text ~ "</orange>";
-    }
+    string orange(const(char)[] text)       { return "<orange>" ~ text ~ "</orange>";          }
     ///ditto
-    string blue(const(char)[] text)
-    {
-        return "<blue>" ~ text ~ "</blue>";
-    }
+    string blue(const(char)[] text)         { return "<blue>" ~ text ~ "</blue>";              }
     ///ditto
-    string magenta(const(char)[] text)
-    {
-        return "<magenta>" ~ text ~ "</magenta>";
-    }
+    string magenta(const(char)[] text)      { return "<magenta>" ~ text ~ "</magenta>";        }
     ///ditto
-    string cyan(const(char)[] text)
-    {
-        return "<cyan>" ~ text ~ "</cyan>";
-    }
+    string cyan(const(char)[] text)         { return "<cyan>" ~ text ~ "</cyan>";              }
     ///ditto
-    string lgrey(const(char)[] text)
-    {
-        return "<lgrey>" ~ text ~ "</lgrey>";
-    }
+    string lgrey(const(char)[] text)        { return "<lgrey>" ~ text ~ "</lgrey>";            }
     ///ditto
-    string grey(const(char)[] text)
-    {
-        return "<grey>" ~ text ~ "</grey>";
-    }
+    string grey(const(char)[] text)         { return "<grey>" ~ text ~ "</grey>";              }
     ///ditto
-    string lred(const(char)[] text)
-    {
-        return "<lred>" ~ text ~ "</lred>";
-    }
+    string lred(const(char)[] text)         { return "<lred>" ~ text ~ "</lred>";              }
     ///ditto
-    string lgreen(const(char)[] text)
-    {
-        return "<lgreen>" ~ text ~ "</lgreen>";
-    }
+    string lgreen(const(char)[] text)       { return "<lgreen>" ~ text ~ "</lgreen>";          }
     ///ditto
-    string yellow(const(char)[] text)
-    {
-        return "<yellow>" ~ text ~ "</yellow>";
-    }
+    string yellow(const(char)[] text)       { return "<yellow>" ~ text ~ "</yellow>";          }
     ///ditto
-    string lblue(const(char)[] text)
-    {
-        return "<lblue>" ~ text ~ "</lblue>";
-    }
+    string lblue(const(char)[] text)        { return "<lblue>" ~ text ~ "</lblue>";            }
     ///ditto
-    string lmagenta(const(char)[] text)
-    {
-        return "<lmagenta>" ~ text ~ "</lmagenta>";
-    }
+    string lmagenta(const(char)[] text)     { return "<lmagenta>" ~ text ~ "</lmagenta>";      }
     ///ditto
-    string lcyan(const(char)[] text)
-    {
-        return "<lcyan>" ~ text ~ "</lcyan>";
-    }
+    string lcyan(const(char)[] text)        { return "<lcyan>" ~ text ~ "</lcyan>";            }
     ///ditto
-    string white(const(char)[] text)
-    {
-        return "<white>" ~ text ~ "</white>";
-    }
+    string white(const(char)[] text)        { return "<white>" ~ text ~ "</white>";            }
 
     /// Change background color of the text.
     /// This wraps the text around, for consumption into `cwrite` or equivalent.
-    string on_black(const(char)[] text)
-    {
-        return "<on_black>" ~ text ~ "</on_black>";
-    }
+    string on_black(const(char)[] text)    { return "<on_black>" ~ text ~ "</on_black>";       }
     ///ditto
-    string on_red(const(char)[] text)
-    {
-        return "<on_red>" ~ text ~ "</on_red>";
-    }
+    string on_red(const(char)[] text)      { return "<on_red>" ~ text ~ "</on_red>";           }
     ///ditto
-    string on_green(const(char)[] text)
-    {
-        return "<on_green>" ~ text ~ "</on_green>";
-    }
+    string on_green(const(char)[] text)    { return "<on_green>" ~ text ~ "</on_green>";       }
     ///ditto
-    string on_orange(const(char)[] text)
-    {
-        return "<on_orange>" ~ text ~ "</on_orange>";
-    }
+    string on_orange(const(char)[] text)   { return "<on_orange>" ~ text ~ "</on_orange>";     }
     ///ditto
-    string on_blue(const(char)[] text)
-    {
-        return "<on_blue>" ~ text ~ "</on_blue>";
-    }
+    string on_blue(const(char)[] text)     { return "<on_blue>" ~ text ~ "</on_blue>";         }
     ///ditto
-    string on_magenta(const(char)[] text)
-    {
-        return "<on_magenta>" ~ text ~ "</on_magenta>";
-    }
+    string on_magenta(const(char)[] text)  { return "<on_magenta>" ~ text ~ "</on_magenta>";   }
     ///ditto
-    string on_cyan(const(char)[] text)
-    {
-        return "<on_cyan>" ~ text ~ "</on_cyan>";
-    }
+    string on_cyan(const(char)[] text)     { return "<on_cyan>" ~ text ~ "</on_cyan>";         }
     ///ditto
-    string on_lgrey(const(char)[] text)
-    {
-        return "<on_lgrey>" ~ text ~ "</on_lgrey>";
-    }
+    string on_lgrey(const(char)[] text)    { return "<on_lgrey>" ~ text ~ "</on_lgrey>";       }
     ///ditto
-    string on_grey(const(char)[] text)
-    {
-        return "<on_grey>" ~ text ~ "</on_grey>";
-    }
+    string on_grey(const(char)[] text)     { return "<on_grey>" ~ text ~ "</on_grey>";         }
     ///ditto
-    string on_lred(const(char)[] text)
-    {
-        return "<on_lred>" ~ text ~ "</on_lred>";
-    }
+    string on_lred(const(char)[] text)     { return "<on_lred>" ~ text ~ "</on_lred>";         }
     ///ditto
-    string on_lgreen(const(char)[] text)
-    {
-        return "<on_lgreen>" ~ text ~ "</on_lgreen>";
-    }
+    string on_lgreen(const(char)[] text)   { return "<on_lgreen>" ~ text ~ "</on_lgreen>";     }
     ///ditto
-    string on_yellow(const(char)[] text)
-    {
-        return "<on_yellow>" ~ text ~ "</on_yellow>";
-    }
+    string on_yellow(const(char)[] text)   { return "<on_yellow>" ~ text ~ "</on_yellow>";     }
     ///ditto
-    string on_lblue(const(char)[] text)
-    {
-        return "<on_lblue>" ~ text ~ "</on_lblue>";
-    }
+    string on_lblue(const(char)[] text)    { return "<on_lblue>" ~ text ~ "</on_lblue>";       }
     ///ditto
-    string on_lmagenta(const(char)[] text)
-    {
-        return "<on_lmagenta>" ~ text ~ "</on_lmagenta>";
-    }
+    string on_lmagenta(const(char)[] text) { return "<on_lmagenta>" ~ text ~ "</on_lmagenta>"; }
     ///ditto
-    string on_lcyan(const(char)[] text)
-    {
-        return "<on_lcyan>" ~ text ~ "</on_lcyan>";
-    }
+    string on_lcyan(const(char)[] text)    { return "<on_lcyan>" ~ text ~ "</on_lcyan>";       }
     ///ditto
-    string on_white(const(char)[] text)
-    {
-        return "<on_white>" ~ text ~ "</on_white>";
-    }
+    string on_white(const(char)[] text)    { return "<on_white>" ~ text ~ "</on_white>";       }
 }
 
 /// Wraps text into a particular foreground color.
+/// Wrong colourname gets ignored.
 string color(const(char)[] text, const(char)[] color) pure @safe
 {
     return format("<%s>%s</%s>", color, text, color);
@@ -438,22 +337,22 @@ private:
     
         switch(tagName)
         {
-            case "black":    setColor(TermColor.black,  bg); break;
-            case "red":      setColor(TermColor.red,    bg); break;
-            case "green":    setColor(TermColor.green,  bg); break;
-            case "orange":   setColor(TermColor.orange, bg); break;
-            case "blue":     setColor(TermColor.blue,   bg); break;
-            case "magenta":  setColor(TermColor.magenta,bg); break;
-            case "cyan":     setColor(TermColor.cyan,   bg); break;
-            case "lgrey":    setColor(TermColor.lgrey,  bg); break;
-            case "grey":     setColor(TermColor.grey,   bg); break;
-            case "lred":     setColor(TermColor.lred,   bg); break;
-            case "lgreen":   setColor(TermColor.lgreen, bg); break;
-            case "yellow":   setColor(TermColor.yellow, bg); break;
-            case "lblue":    setColor(TermColor.lblue,  bg); break;
-            case "lmagenta": setColor(TermColor.lmagenta,bg); break;
-            case "lcyan":    setColor(TermColor.lcyan,  bg); break;
-            case "white":    setColor(TermColor.white,  bg); break;
+            case "black":    setColor(TermColor.black,    bg); break;
+            case "red":      setColor(TermColor.red,      bg); break;
+            case "green":    setColor(TermColor.green,    bg); break;
+            case "orange":   setColor(TermColor.orange,   bg); break;
+            case "blue":     setColor(TermColor.blue,     bg); break;
+            case "magenta":  setColor(TermColor.magenta,  bg); break;
+            case "cyan":     setColor(TermColor.cyan,     bg); break;
+            case "lgrey":    setColor(TermColor.lgrey,    bg); break;
+            case "grey":     setColor(TermColor.grey,     bg); break;
+            case "lred":     setColor(TermColor.lred,     bg); break;
+            case "lgreen":   setColor(TermColor.lgreen,   bg); break;
+            case "yellow":   setColor(TermColor.yellow,   bg); break;
+            case "lblue":    setColor(TermColor.lblue,    bg); break;
+            case "lmagenta": setColor(TermColor.lmagenta, bg); break;
+            case "lcyan":    setColor(TermColor.lcyan,    bg); break;
+            case "white":    setColor(TermColor.white,    bg); break;
             default:
                 break; // unknown tag
         }
@@ -489,22 +388,6 @@ private:
         }
     }
     
-    /*
-    void debugPrintStack()
-    {
-        import std.stdio;
-        writeln("Stack state");
-        for (int n = 0; n <= _tagStackIndex; ++n)
-        {
-            import std.stdio;
-            writefln("tag %s   fg = %s  bg = %s",
-                     _stack[_tagStackIndex].name, _stack[_tagStackIndex].fg, _stack[_tagStackIndex].bg);
-        }
-        writeln;
-    }
-    */
-
-
     void exitTag(const(char)[] tagName)
     {
         if (_tagStackIndex <= 0)
@@ -719,4 +602,247 @@ private:
             return r;
         }
     }
+}
+
+nothrow @nogc @safe:
+
+/// Those are the colors supported by `Terminal` (not the colors of the outside API).
+/// Their value when positive is the value of Windows foreground colors.
+enum TermColor : int
+{
+    unknown = -2,  // unknown color, for example when detection failed
+    initial = -1,  // the color detected at creation of Terminal
+    black   = 0,
+    red,
+    green,
+    orange,
+    blue,
+    magenta,
+    cyan,
+    lgrey,
+    grey,
+    lred,
+    lgreen,
+    yellow,
+    lblue,
+    lmagenta,
+    lcyan,
+    white,
+}
+
+
+// Term provide the following API:
+// - initialize(): capture existing colors, restore them in destructor
+// - setForegroundColor(TermColor color)
+// - setBackgroundColor(TermColor color)
+struct Terminal
+{
+nothrow @nogc @safe:
+
+    // Initialize the terminal.
+    // Return: success. If false, don't use this instance.
+    bool initialize() @trusted
+    {
+        version(Posix) 
+        {
+            _initialForegroundColor = TermColor.initial;
+            _initialBackgroundColor = TermColor.initial;
+            _currentForegroundColor = _initialForegroundColor;
+            _currentBackgroundColor = _initialBackgroundColor;
+            return true;
+        }
+        else version(Windows)
+        {
+            // saves console attributes
+            _console = GetStdHandle(STD_OUTPUT_HANDLE);
+            if (_console == null)
+                return false;
+            CONSOLE_SCREEN_BUFFER_INFO consoleInfo;
+            if (_console && GetConsoleScreenBufferInfo(_console, &consoleInfo) != 0)
+            {
+                _currentAttr = consoleInfo.wAttributes;
+
+                _initialForegroundColor = convertWinattrToTermColor(_currentAttr, false);
+                _initialBackgroundColor = convertWinattrToTermColor(_currentAttr, true);
+
+                _currentForegroundColor = _initialForegroundColor;
+                _currentBackgroundColor = _initialBackgroundColor;
+                return true;
+            }
+            else
+                return false;
+        }
+        else
+            static assert(false);
+    }
+
+    ~this() @trusted
+    {
+        // Note that this is also destructed if constructor failed (.init)
+        // so have to handle it anyway like most D objects.
+        if (!_initialized)
+            return;
+
+        version(Windows)
+        {            
+            setForegroundColor(_initialForegroundColor, null);
+            setBackgroundColor(_initialBackgroundColor, null);
+        }
+        else version(Posix)
+        {
+            printf("\x1B[0m");
+        }
+        else
+            static assert(false);
+    }
+
+    void setForegroundColor(TermColor color, 
+                            scope void delegate() nothrow @nogc callThisBeforeChangingColor  ) @trusted
+    {
+        assert(color != TermColor.unknown);
+
+        if (color == TermColor.initial)
+            color = _initialForegroundColor;
+
+        if (_currentForegroundColor == color)
+            return;
+        _currentForegroundColor = color;
+
+        if (callThisBeforeChangingColor)
+            callThisBeforeChangingColor();
+        version(Windows)
+        {
+            WORD attr = cast(WORD)( (_currentAttr & ~FOREGROUND_MASK) | convertTermColorToWinAttr(color, false) );
+            SetConsoleTextAttribute(_console, attr);
+            _currentAttr = attr;
+        }
+        else version(Posix)
+        {
+            int code = convertTermColorToVT100Attr(color, false);
+            printf("\x1B[%dm", code);
+        }
+        else
+            static assert(false);
+    }
+
+    void setBackgroundColor(TermColor color, scope void delegate() nothrow @nogc callThisBeforeChangingColor) @trusted
+    {
+        assert(color != TermColor.unknown);
+
+        if (color == TermColor.initial)
+            color = _initialBackgroundColor;
+
+        if (_currentBackgroundColor == color)
+            return;
+        _currentBackgroundColor = color;
+
+        if (callThisBeforeChangingColor)
+            callThisBeforeChangingColor();
+        version(Windows)
+        {
+            WORD attr = cast(WORD)( (_currentAttr & ~BACKGROUND_MASK) | (convertTermColorToWinAttr(color, true)) );
+            SetConsoleTextAttribute(_console, attr);
+            _currentAttr = attr;
+        }
+        else version(Posix)
+        {
+            int code = convertTermColorToVT100Attr(color, true);
+            printf("\x1B[%dm", code);
+        }
+        else
+            static assert(false);
+    }
+
+private:
+
+    // Successfully initialized.
+    bool _initialized = false;
+
+    // At initialization, find those.
+    TermColor _initialForegroundColor = TermColor.unknown;
+    TermColor _initialBackgroundColor = TermColor.unknown;
+
+    // Act as cache to avoid useless syscalls.
+    TermColor _currentForegroundColor = TermColor.unknown;
+    TermColor _currentBackgroundColor = TermColor.unknown;
+
+    version(Windows)
+    {
+        HANDLE _console;   // console handle.
+        WORD _currentAttr; // Last known cached console attribute.
+        CONSOLE_SCREEN_BUFFER_INFO consoleInfo;
+    }
+
+    version(Windows)
+    {
+        enum int BACKGROUND_MASK = (BACKGROUND_BLUE | BACKGROUND_GREEN | BACKGROUND_RED | BACKGROUND_INTENSITY);
+        enum int FOREGROUND_MASK = (FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_RED | FOREGROUND_INTENSITY);
+
+        // Note: rotation, LUT works in both direction.
+        static immutable ubyte[16] TRANSLATE_WINATTR = [ 0,  4,  2,  6, 1,  5,  3, 7, 8, 12, 10, 14, 9, 13, 11, 15 ];
+    }
+
+    TermColor convertWinattrToTermColor(int attrUnmasked, bool bg)
+    {
+        if (bg) attrUnmasked = attrUnmasked >>> 4;
+        return cast(TermColor) TRANSLATE_WINATTR[attrUnmasked & 15];
+    }
+
+    /// Return a mask representing windows attribute for color c.
+    int convertTermColorToWinAttr(TermColor c, bool bg)
+    {
+        assert (c != TermColor.unknown);
+        if (c == TermColor.initial)
+            return bg ? _initialBackgroundColor : _initialForegroundColor;
+        else
+        {
+            int res = TRANSLATE_WINATTR[cast(ubyte)c];
+            if (bg) res = res << 4;
+            return res;
+        }
+    }
+
+    int convertTermColorToVT100Attr(TermColor c, bool bg)
+    {
+        assert (c != TermColor.unknown);
+
+        int res;
+
+        if (c == TermColor.initial)
+        {
+            res = 39;
+        }
+        else
+        {
+            int lowbits = c & 7;
+            bool intensity = (c & 8) != 0;
+            res = 30 + lowbits;
+            if (intensity) res += 60;
+        }
+
+        if (bg) res += 10;
+
+        return res;
+    }
+}
+
+// Terminal is only valid to use on an actual console device or terminal
+// handle. You should not attempt to construct a Terminal instance if this
+// returns false.
+bool stdoutIsTerminal() @trusted
+{
+    version(Posix) 
+    {
+        return cast(bool) isatty(1);
+    } 
+    else version(Windows) 
+    {
+        HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+        if (hConsole == INVALID_HANDLE_VALUE)
+            return false;
+
+        return GetFileType(hConsole) == FILE_TYPE_CHAR;
+    }
+    else
+        static assert(false);
 }
