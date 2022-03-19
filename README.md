@@ -7,12 +7,13 @@ It is meant as a spiritual successor of the `colorize` [package](https://github.
 - Color information can be given in two ways:
    - Within text with easy-to-remember tags, such as `"my <blue> text is <red>coloured</red></blue>"`
      Syntax errors within these tags throw, for the moment.
-   - with string helper UFCS functions, such as `("my" ~ ("text is " ~ coloured.red)).blue`
+   - with string helper UFCS functions, such as `"my" ~ ("text is " ~ "coloured".red).blue`
 
-- Portable (Unix, Windows) with a special `cwrite[f][ln]` call, like the `colorize` package.
+- Portable with a special `cwrite[f][ln]` call, like the `colorize` package.
   Indeed, color information need to be **inline within text**, to properly nest in format strings.
+  `console-colors` has a color stack to restore the previously set color.
 
-- All colors have an easy shortcut like `.lyellow` or `.red`, making it easier to add color in the first place (at the cost of your namespace).
+- All colors have an easy shortcut like `.lmagenta` or `.white`, making it easier to add color in the first place (at the cost of your namespace).
 
   ```d
   try
@@ -28,7 +29,6 @@ It is meant as a spiritual successor of the `colorize` [package](https://github.
 - Colors can be disabled globally, with `disableConsoleColors()`.
   It is an often wanted thing in command-line tools with colors.
   Colors are also disabled if `stdout` isn't a terminal, or if the terminal initialization failed.
-
 
 We are heading towards the ultimate console in D. Reaching for the stars here.
 You have no excuse anymore not to have colors in your terminal.
