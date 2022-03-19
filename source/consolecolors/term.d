@@ -9,7 +9,11 @@
 module consolecolors.term;
 
 version(Windows) import core.sys.windows.windows;
-version(Posix) import core.sys.posix.unistd;
+version(Posix) 
+{ 
+	import core.sys.posix.unistd;
+	import core.stdc.stdio;
+}
 
 nothrow @nogc @safe:
 
@@ -54,8 +58,8 @@ struct Terminal
     {
         version(Posix) 
         {
-            _initialForegroundColor = Color.initial;
-            _initialBackgroundColor = Color.initial;
+            _initialForegroundColor = TermColor.initial;
+            _initialBackgroundColor = TermColor.initial;
             _currentForegroundColor = _initialForegroundColor;
             _currentBackgroundColor = _initialBackgroundColor;
             return true;
@@ -85,7 +89,7 @@ struct Terminal
             static assert(false);
     }
 
-    ~this()
+    ~this() @trusted
     {
         // Note that this is also destructed if constructor failed (.init)
         // so have to handle it anyway like most D objects.
@@ -99,7 +103,7 @@ struct Terminal
         }
         else version(Posix)
         {
-            printf("\x1B[0m", code);
+            printf("\x1B[0m");
         }
         else
             static assert(false);
