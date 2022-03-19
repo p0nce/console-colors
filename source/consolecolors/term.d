@@ -54,6 +54,10 @@ struct Terminal
     {
         version(Posix) 
         {
+            _initialForegroundColor = Color.initial;
+            _initialBackgroundColor = Color.initial;
+            _currentForegroundColor = _initialForegroundColor;
+            _currentBackgroundColor = _initialBackgroundColor;
             return true;
         }
         else version(Windows)
@@ -95,6 +99,7 @@ struct Terminal
         }
         else version(Posix)
         {
+            printf("\x1B[0m", code);
         }
         else
             static assert(false);
@@ -122,6 +127,8 @@ struct Terminal
         }
         else version(Posix)
         {
+            int code = convertTermColorToVT100Attr(color, false);
+            printf("\x1B[%dm", code);
         }
         else
             static assert(false);
@@ -148,6 +155,8 @@ struct Terminal
         }
         else version(Posix)
         {
+            int code = convertTermColorToVT100Attr(color, true);
+            printf("\x1B[%dm", code);
         }
         else
             static assert(false);
@@ -214,6 +223,29 @@ private:
                 res = res << 4;
             return res;
         }
+    }
+
+    int convertTermColorToVT100Attr(TermColor c, bool bg)
+    {
+        assert (c != TermColor.unknown);
+
+        int res;
+
+        if (c == TermColor.initial)
+        {
+            res = 39;
+        }
+        else
+        {
+            int lowbits = c & 7;
+            bool intensity = (c & 8) != 0;
+            res = 30 + lowbits;
+            if (intensity) res += 60;
+        }
+
+        if (bg) res += 10;
+
+        return res;
     }
 }
 
