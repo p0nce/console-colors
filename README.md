@@ -3,9 +3,9 @@
 
 ## Goals
 
-`console-colors` is an attempt towards making the **ultimate no-hassle console color library for D.**
+`console-colors` is an attempt towards making the **ultimate zero-hassle console color library for D.**
 
-It is meant as a spiritual successor of the `colorize` [package](https://github.com/yamadapc/d-colorize) and improves it based upon usage on a few areas.
+It is meant as a spiritual successor of the `colorize` [package](https://github.com/yamadapc/d-colorize) and try to improve it based upon industrial usage of console colors in very important software.
 
 
 ## Features
