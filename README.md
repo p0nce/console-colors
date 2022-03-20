@@ -44,7 +44,7 @@ void main(string[] args)
 
 - Color information can be given in two ways:
    - Within text with easy-to-remember tags, such as `"my <blue> text is <red>coloured</red></blue>"`
-     Syntax errors within these tags throw, for the moment.
+     Syntax errors within this DSL called CCL throw, with error messages that are themselves coloured.
    - with string helper UFCS functions, such as `"my" ~ ("text is " ~ "coloured".red).blue`
 
 - Portable with a special `cwrite[f][ln]` call, like the `colorize` package.
@@ -60,5 +60,12 @@ void main(string[] args)
 We are heading towards the ultimate console in D. Reaching for the stars here.
 You have no excuse anymore not to have colors in your terminal.
 
+
+## Caveats
+
+  - Any text that goes through `cwrite` must be CCL, so uncoloured input has to be escaped with `escaleCCL`
+  - `<` needs to be escaped with the entity `&lt;`
+  - `>` needs to be escaped with the entity `&lt;`
+  - `&` needs to be escaped with the entity `&amp;`
 
 _If it's worth having a command-line, then it's worth having colours._
