@@ -4,9 +4,8 @@ void main(string[] args)
 {
     try
     {
-        cwriteln;
         cwriteln("Welcome to &gt;&gt;&gt; <yellow><on_blue> "
-               ~ "console-colors </o n_blue></yellow> &lt;&lt;&lt;");
+               ~ "console-colors </on_blue></yellow> &lt;&lt;&lt;");
         cwriteln;
         cwritefln("In this library, %s are nestable thanks to a state machine.\n".yellow, 
                   " text colors ".lmagenta.on_white);

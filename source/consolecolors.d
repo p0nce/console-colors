@@ -665,7 +665,7 @@ private:
             {
                 char ch = peek();
                 if (ch == '>')
-                    throw new CCLException("Illegal character &gt;, use &amp;&gt; instead if intended");
+                    throw new CCLParseException(inputPos, "illegal character <lcyan>&gt;</lcyan>, do you mean <lcyan>&amp;gt;</lcyan>?");
                 if (ch == '<') 
                     break;
                 if (ch == '&') 
@@ -962,6 +962,9 @@ unittest
 
     // INVALID: input ending on <
     assert(!isValidCCL("my input <"));
+
+    // INVALID: accidental >
+    assert(!isValidCCL("done > todo"));
 
     // INVALID: input ending on </
     assert(!isValidCCL("my input </"));
