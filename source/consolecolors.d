@@ -14,6 +14,9 @@ import std.string: format;
 version(Windows) import core.sys.windows.windows;
 version(Posix) import core.sys.posix.unistd;
 
+
+// MAYDO Explain CCL here (Console Colors Language)
+
 public:
 
 /// Return all available console string colors for this library.
@@ -23,6 +26,45 @@ string[] availableConsoleColors() pure nothrow @safe
         "black",  "red",  "green",  "orange",  "blue",  "magenta", "cyan", "lgrey", 
         "grey", "lred", "lgreen", "yellow", "lblue", "lmagenta", "lcyan", "white"
     ];
+}
+
+/// Return: true if `text` is valid, and thus suitable for `cwrite`.
+bool isValidCCL(const(char)[] text) nothrow @trusted
+{
+    try
+    {
+        TermInterpreter term;
+        term.initializeJustForParsing();
+        term.interpret(text);
+        return true;
+    }
+    catch(Exception e)
+    {
+        return false;
+    }
+}
+
+/// When input text doesn't parse, it throws.
+class ParseCCLException : Exception
+{
+    this(int inputLine, int inputCol, string msg, string file = __FILE__, size_t line = __LINE__,
+         Throwable next = null) @nogc @safe pure nothrow
+         {
+            _col = inputCol;
+            _line = inputLine;
+            super(msg, file, line, next);
+         }
+
+    this(int inputLine, int inputCol, string msg, Throwable next, string file = __FILE__,
+     size_t line = __LINE__) @nogc @safe pure nothrow
+     {
+        _col = inputCol;
+        _line = inputLine;
+        super(msg, file, line, next);
+     }
+private:
+    int _col; // column in text position that didn't parse
+    int _line; // line in input text position that didn't parse
 }
 
 pure nothrow @safe
@@ -126,20 +168,7 @@ void cwrite(T...)(T args)
     string s = "";
     foreach(arg; args)
         s ~= to!string(arg);
-
-    int res = emitToTerminal(s);
-
-    // Throw error if parsing error.
-    switch(res)
-    {
-        case CC_ERR_OK: break;
-        case CC_UNTERMINATED_TAG: throw new Exception("Unterminated <tag> in coloured text");
-        case CC_UNKNOWN_TAG:      throw new Exception("Unknown <tag> in coloured text");
-        case CC_MISMATCHED_TAG:   throw new Exception("Mismatched <tag> in coloured text");
-        case CC_TERMINAL_ERROR:   throw new Exception("Unspecified terminal error");
-        default:
-            assert(false); // if you fail here, console-colors is buggy
-    }
+    emitToTerminal(s);
 }
 
 ///ditto
@@ -173,12 +202,6 @@ void disableConsoleColors()
 // PRIVATE PARTS API START HERE
 private:
 
-
-enum int CC_ERR_OK = 0,           // "<blue>text</blue>"
-         CC_UNTERMINATED_TAG = 1, // "<blue"
-         CC_UNKNOWN_TAG = 2,      // "<pink>text</pink>"
-         CC_MISMATCHED_TAG = 3,   // "<blue>text</red>"
-         CC_TERMINAL_ERROR = 4;   // terminal.d error.
 
 // Implementation of `emitToTerminal`. This is a combined lexer/parser/emitter.
 // It can throw Exception in case of misformat of the input text.
@@ -217,7 +240,12 @@ struct TermInterpreter
         }
     }
 
-    ~this()
+    void initializeJustForParsing()
+    {
+        _enableTerm = false;
+    }
+
+    ~this() pure
     {
     }
 
@@ -274,7 +302,8 @@ struct TermInterpreter
 
                         case TokenType.text:
                         {
-                            printf("%.*s", cast(int)token.text.length, token.text.ptr);
+                            if (_enableTerm)
+                                printf("%.*s", cast(int)token.text.length, token.text.ptr);
                             break;
                         }
 
@@ -285,6 +314,12 @@ struct TermInterpreter
                     }
                 break;
             }
+        }
+
+        // Is there any unclosed tags?
+        if (_tagStackIndex != 0)
+        {
+            throw new Exception(format("Unclosed tag: <%s>", stack(_tagStackIndex).name));
         }
         return 0;
     }
@@ -304,7 +339,7 @@ private:
     }
     enum int MAX_NESTED_TAGS = 32;
 
-    Tag[MAX_NESTED_TAGS] _stack;
+    Tag[MAX_NESTED_TAGS+1] _stack;
     int _tagStackIndex;
 
     ref Tag stack(int index) nothrow @nogc return
@@ -520,7 +555,7 @@ private:
 
                     next;
                     if (!hasNextChar())
-                        throw new Exception("Excepted '>' in closing tag ");
+                        throw new Exception("Expected '>' in closing tag ");
 
                     if (peek() == '>')
                     {
@@ -530,6 +565,8 @@ private:
                         r.text = tagName;
                         return r;
                     }
+                    else
+                        throw new Exception("Expected '>' after '/'");
                 }
                 else if (ch == '>')
                 {
@@ -552,7 +589,7 @@ private:
             // it is an HTML entity
             next;
             if (!hasNextChar())
-                throw new Exception("Excepted entity name after &");
+                throw new Exception("Expected entity name after &");
 
             int startOfEntity = inputPos;
             while(hasNextChar())
@@ -604,7 +641,7 @@ private:
     }
 }
 
-nothrow @nogc @safe:
+nothrow @safe:
 
 /// Those are the colors supported by `Terminal` (not the colors of the outside API).
 /// Their value when positive is the value of Windows foreground colors.
@@ -829,7 +866,7 @@ private:
 // Terminal is only valid to use on an actual console device or terminal
 // handle. You should not attempt to construct a Terminal instance if this
 // returns false.
-bool stdoutIsTerminal() @trusted
+bool stdoutIsTerminal() @nogc @trusted
 {
     version(Posix) 
     {
@@ -845,4 +882,70 @@ bool stdoutIsTerminal() @trusted
     }
     else
         static assert(false);
+}
+
+// Here we describe the specifics of the Console Colors Language.
+unittest
+{
+    // VALID: regular input.
+    assert(isValidCCL( "<green>text</green>"));
+
+    // VALID: unknown tag.
+    assert(isValidCCL( "<unknown>text</unknown>"));
+
+    // VALID: open-closed tag.
+    assert(isValidCCL( "<autonomous/>"));
+
+    // VALID: nested.
+    assert(isValidCCL( "<green>text<red>lol</red></green>"));
+
+    // VALID: UTF-8 multibyte characters.
+    assert(isValidCCL( "<green>Hé ça va là?</green>"));
+
+    // VALID: 32 levels of nesting.
+    enum string x32OpeningTags = "<r><r><r><r><r><r><r><r><r><r><r><r><r><r><r><r>"
+                               ~ "<r><r><r><r><r><r><r><r><r><r><r><r><r><r><r><r>";
+    enum string x32ClosingTags = "</r></r></r></r></r></r></r></r></r></r></r></r></r></r></r></r>"
+                               ~ "</r></r></r></r></r></r></r></r></r></r></r></r></r></r></r></r>";
+    assert(isValidCCL(x32OpeningTags ~ "text" ~ x32ClosingTags));
+
+    // INVALID: 33 levels of nesting.
+    assert(!isValidCCL(x32OpeningTags ~ "<a>text</a>" ~ x32ClosingTags));
+
+    // INVALID: unexpected closing tag
+    assert(!isValidCCL("text</blue>"));
+
+    // INVALID: unclosed opening tag
+    assert(!isValidCCL("text<blue>"));
+
+    // INVALID: tag mismatch
+    assert(!isValidCCL("<a>text</b>"));
+
+    // INVALID: input ending on <
+    assert(!isValidCCL("my input <"));
+
+    // INVALID: input ending on </
+    assert(!isValidCCL("my input </"));
+
+    // INVALID: tags like </this/>
+    assert(!isValidCCL("</this/>"));
+
+    // INVALID: unterminated open-close tag
+    assert(!isValidCCL("<red/"));
+
+    // INVALID: unterminated tag
+    assert(!isValidCCL("<important"));
+    assert(!isValidCCL("</important"));
+
+    // INVALID: expected '>' after '/'
+    assert(!isValidCCL("<important/"));
+
+    // INVALID: unterminated &entity;
+    assert(!isValidCCL("&gt"));
+
+    // INVALID: invalid character in entity name
+    assert(!isValidCCL("&@;"));
+
+    // INVALID: unknown entity name
+    assert(!isValidCCL("&unknown;"));
 }
