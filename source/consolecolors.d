@@ -10,7 +10,7 @@ module consolecolors;
 
 import core.stdc.stdio: printf, FILE, fwrite, fflush, fputc;
 import std.stdio : File, stdout;
-import std.string: format;
+import std.string: format, replace;
 version(Windows) import core.sys.windows.windows;
 version(Posix) import core.sys.posix.unistd;
 
@@ -18,6 +18,26 @@ version(Posix) import core.sys.posix.unistd;
 // MAYDO Explain CCL here (Console Colors Language)
 
 public:
+
+/// In input language, cannot more than `CCL_MAX_NESTED_TAGS` levels of nested tags.
+enum int CCL_MAX_NESTED_TAGS = 32;
+
+/// An exception whose text is coloured, it follows the CCL language.
+/// You can convert it back to a regular exception with `unescapeCCL(e.msg)`.
+class CCLException : Exception
+{
+    this(string msg, string file = __FILE__, size_t line = __LINE__,
+         Throwable next = null) @nogc @safe pure nothrow
+         {
+            super(msg, file, line, next);
+         }
+
+    this(string msg, Throwable next, string file = __FILE__,
+         size_t line = __LINE__) @nogc @safe pure nothrow
+         {
+            super(msg, file, line, next);
+         }
+}
 
 /// Return all available console string colors for this library.
 string[] availableConsoleColors() pure nothrow @safe
@@ -38,33 +58,26 @@ bool isValidCCL(const(char)[] text) nothrow @trusted
         term.interpret(text);
         return true;
     }
-    catch(Exception e)
+    catch(CCLException e)
     {
         return false;
     }
+    catch(Exception e)
+    {
+        assert(false); // should only catch CCLException in this library.
+    }
 }
 
-/// When input text doesn't parse, it throws.
-class ParseCCLException : Exception
+/// Escape arbitrary text to go into `cwrite` without changing colors.
+/// '<', '>' and '&' are rewritten as entities.
+/// Note: exception can have CCL text or non-CCL text.
+///       CCL text must be written with `cwrite`.
+const(char)[] escapeCCL(scope const(char)[] text) nothrow @trusted
 {
-    this(int inputLine, int inputCol, string msg, string file = __FILE__, size_t line = __LINE__,
-         Throwable next = null) @nogc @safe pure nothrow
-         {
-            _col = inputCol;
-            _line = inputLine;
-            super(msg, file, line, next);
-         }
-
-    this(int inputLine, int inputCol, string msg, Throwable next, string file = __FILE__,
-     size_t line = __LINE__) @nogc @safe pure nothrow
-     {
-        _col = inputCol;
-        _line = inputLine;
-        super(msg, file, line, next);
-     }
-private:
-    int _col; // column in text position that didn't parse
-    int _line; // line in input text position that didn't parse
+    // PERF: this is bad.
+    return text.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;");
 }
 
 pure nothrow @safe
@@ -205,10 +218,25 @@ private:
 
 // Implementation of `emitToTerminal`. This is a combined lexer/parser/emitter.
 // It can throw Exception in case of misformat of the input text.
-int emitToTerminal( const(char)[] s) @trusted
+void emitToTerminal(scope const(char)[] s) @trusted
 {
     TermInterpreter* term = &g_termInterpreter;
-    return term.interpret(s);  
+    try
+    {        
+        term.interpret(s);  
+    }
+    catch (CCLParseException e)
+    {
+        throw new CCLException(e.nicerMessage(s));
+    }
+    catch(CCLException e)
+    {
+        throw e;
+    }
+    catch (Exception e)
+    {
+        assert(false); // console-colors shoudln't throw colorless error messages itself
+    }
 }
 
 private:
@@ -255,8 +283,7 @@ struct TermInterpreter
     }
 
     /// Moves the interpreter forward, eventually do actions.
-    /// Return: error code.
-    int interpret(const(char)[] s)
+    void interpret(const(char)[] s)
     {
         // Init tag stack.
         // State is reset between all calls to interpret, so that errors can be eaten out.
@@ -283,20 +310,20 @@ struct TermInterpreter
                     {
                         case TokenType.tagOpen:
                         {
-                            enterTag(token.text);
+                            enterTag(token.text, token.inputPos);
                             break;
                         }
 
                         case TokenType.tagClose:
                         {
-                            exitTag(token.text);
+                            exitTag(token.text, token.inputPos);
                             break;
                         }
 
                         case TokenType.tagOpenClose:
                         {
-                            enterTag(token.text);
-                            exitTag(token.text);
+                            enterTag(token.text, token.inputPos);
+                            exitTag(token.text, token.inputPos);
                             break;
                         }
 
@@ -319,9 +346,9 @@ struct TermInterpreter
         // Is there any unclosed tags?
         if (_tagStackIndex != 0)
         {
-            throw new Exception(format("Unclosed tag: <%s>", stack(_tagStackIndex).name));
+            throw new CCLParseException(stack(_tagStackIndex).inputPos,
+                                        format("<lcyan>&lt;%s&gt;</lcyan> tag is open but never closed.", stack(_tagStackIndex).name));
         }
-        return 0;
     }
 
 private:
@@ -336,10 +363,10 @@ private:
         TermColor fg = TermColor.unknown;  // last applied foreground color
         TermColor bg = TermColor.unknown;  // last applied background color
         const(char)[] name; // last applied tag
+        int inputPos; // position of the opening tag in input chars.
     }
-    enum int MAX_NESTED_TAGS = 32;
-
-    Tag[MAX_NESTED_TAGS+1] _stack;
+    
+    Tag[CCL_MAX_NESTED_TAGS+1] _stack;
     int _tagStackIndex;
 
     ref Tag stack(int index) nothrow @nogc return
@@ -352,14 +379,15 @@ private:
         return _stack[_tagStackIndex];
     }
 
-    void enterTag(const(char)[] tagName)
+    void enterTag(const(char)[] tagName, int inputPos)
     {
-        if (_tagStackIndex >= MAX_NESTED_TAGS)
-            throw new Exception("Tag stack is full, internal error of console-colors");
+        if (_tagStackIndex >= CCL_MAX_NESTED_TAGS)
+            throw new CCLException("Tag stack is full. Try using less color tags.");
 
         // dup top of stack, set foreground color
         _stack[_tagStackIndex + 1] = _stack[_tagStackIndex]; 
         _stack[_tagStackIndex + 1].name = tagName; // Note: this name doesn't outlive the line of text we write
+        _stack[_tagStackIndex + 1].inputPos = inputPos;
 
         _tagStackIndex += 1;
 
@@ -423,13 +451,17 @@ private:
         }
     }
     
-    void exitTag(const(char)[] tagName)
+    void exitTag(const(char)[] tagName, int inputPos)
     {
         if (_tagStackIndex <= 0)
-            throw new Exception("Unexpected closing tag");
+            throw new CCLParseException(inputPos, format("unexpected <lcyan>&lt;/%s&gt;</lcyan> closing tag.", tagName));
         
         if (stackTop().name != tagName)
-            throw new Exception("Closing tag mismatch");
+        {
+            throw new CCLParseException(inputPos, 
+                format("<lcyan>&lt;%s&gt;</lcyan> doesn't match closing tag <lcyan>&lt;/%s&gt;</lcyan>",
+                stackTop().name, tagName));
+        }
 
         // drop one state of stack, apply old style
         _tagStackIndex -= 1;        
@@ -502,6 +534,7 @@ private:
     void next()
     {
         inputPos += 1;
+        assert(inputPos <= input.length);
     }
 
     void flushStdoutIfWindows() nothrow @nogc
@@ -527,18 +560,21 @@ private:
         }
         else if (peek() == '<')
         {
+            int posOfLt = inputPos;
+
             // it is a tag
             bool closeTag = false;
             next;
             if (!hasNextChar())
-                throw new Exception("Excepted tag name after <");
+                throw new CCLParseException(inputPos - 1, "expected tag name after <lcyan>&lt;</lcyan>, perhaps you meant <lcyan>&amp;lt;</lcyan>?");
 
+            char ch2 = peek();
             if (peek() == '/')
             {
                 closeTag = true;
                 next;
                 if (!hasNextChar())
-                    throw new Exception("Excepted tag name after </");
+                    throw new CCLParseException(inputPos - 1, "expected tag name after <lcyan>&lt;/</lcyan>");
             }
 
             const(char)[] tagName;
@@ -551,11 +587,11 @@ private:
                 {
                     tagName = charsSincePos(startOfTagName);
                     if (closeTag)
-                        throw new Exception("Can't have tags like this </tagname/>");
+                        throw new CCLParseException(startOfTagName - 2, format("invalid tag syntax <lcyan>&lt;/%s/&gt;</lcyan>", tagName));
 
                     next;
                     if (!hasNextChar())
-                        throw new Exception("Expected '>' in closing tag ");
+                        throw new CCLParseException(inputPos, "expected <lcyan>&gt;</lcyan> after tag.");
 
                     if (peek() == '>')
                     {
@@ -566,7 +602,7 @@ private:
                         return r;
                     }
                     else
-                        throw new Exception("Expected '>' after '/'");
+                        throw new CCLException("Expected '&gt;' after '/'");
                 }
                 else if (ch == '>')
                 {
@@ -577,19 +613,22 @@ private:
                     return r;
                 }
                 else
-                {
+                {   
                     next;
                 }
                 // TODO: check chars are valid in HTML tags
             }
-            throw new Exception("Unterminated tag");
+            if (closeTag)
+                throw new CCLParseException(inputPos, format("unterminated tag <lcyan>&lt;/%s&gt;</lcyan>", charsSincePos(startOfTagName)));
+            else
+                throw new CCLParseException(posOfLt, "unterminated tag starting here, do you mean <lcyan>&amp;lt;</lcyan>?");
         }
         else if (peek() == '&')
         {
             // it is an HTML entity
             next;
             if (!hasNextChar())
-                throw new Exception("Expected entity name after &");
+                throw new CCLParseException(inputPos, "expected entity name after &amp;");
 
             int startOfEntity = inputPos;
             while(hasNextChar())
@@ -604,7 +643,7 @@ private:
                         case "gt": r.text = ">"; break;
                         case "amp": r.text = "&"; break;
                         default: 
-                            throw new Exception("Unknown entity name");
+                            throw new CCLParseException(startOfEntity, format("unknown entity <lcyan>%s</lcyan>, do you mean <lcyan>&amp;lt;</lcyan>, <lcyan>&amp;gt;</lcyan> or <lcyan>&amp;amp;</lcyan>?", entityName));
                     }
                     next;
                     r.type = TokenType.text;
@@ -615,9 +654,9 @@ private:
                     next;
                 }
                 else
-                    throw new Exception("Illegal character in entity name, you probably mean &lt; or &gt; or &amp;");                
+                    throw new CCLParseException(inputPos, "illegal character in entity, do you mean <lcyan>&amp;lt;</lcyan>, <lcyan>&amp;gt;</lcyan> or <lcyan>&amp;amp;</lcyan>?");
             }
-            throw new Exception("Unfinished entity name, you probably mean &lt; or &gt; or &amp;");
+            throw new CCLParseException(inputPos, "unfinished entity name, <lcyan>;</lcyan> probably missing. Or you mean <lcyan>&amp;amp;</lcyan>?");
         }
         else 
         {
@@ -626,7 +665,7 @@ private:
             {
                 char ch = peek();
                 if (ch == '>')
-                    throw new Exception("Illegal character >, use &gt; instead if intended");
+                    throw new CCLException("Illegal character &gt;, use &amp;&gt; instead if intended");
                 if (ch == '<') 
                     break;
                 if (ch == '&') 
@@ -948,4 +987,79 @@ unittest
 
     // INVALID: unknown entity name
     assert(!isValidCCL("&unknown;"));
+}
+
+/// When input text doesn't parse, it throws.
+/// This exception is used internally to forge super nice error messages.
+class CCLParseException : CCLException // parse error have themselves colors.
+{
+    this(int inputCol, string msg, string file = __FILE__, size_t line = __LINE__,
+         Throwable next = null) @nogc @safe pure nothrow
+         {
+            _col = inputCol;
+            _line = -1;
+            super(msg, file, line, next);
+         }
+
+    this(int inputCol, string msg, Throwable next, string file = __FILE__,
+         size_t line = __LINE__) @nogc @safe pure nothrow
+         {
+            _col = inputCol;
+            _line = -1;
+            super(msg, file, line, next);
+         }
+
+    // Quote the relevant input line, and make a nice ----------^ message.
+    string nicerMessage(scope const(char)[] wholeInput) @trusted
+    {
+        assert(wholeInput.length != 0); // "" would not trigger errors
+        // Returns:
+        // 
+        // msg
+        // line of text with error
+        // -------------^
+        //
+
+        int where = _col;
+        assert(where >= 0 && where <= wholeInput.length);
+
+        // Backtrack to find start and stop of line in the input.
+        int start = where;
+        if (start >= wholeInput.length)
+        {
+            start = cast(int)(wholeInput.length) - 1;
+        }
+
+        while(start > 0)
+        {
+            char ch = wholeInput[start - 1];
+            if (ch == '\n' || ch == '\r' || ch == '\0')
+                break;
+            start--;
+        }
+
+        int end = where;
+        while(end < wholeInput.length)
+        {
+            char ch = wholeInput[end];
+            if (ch == '\n' || ch == '\r' || ch == '\0')
+                break;
+            end++;
+        }
+
+        char[] message = msg ~ "\n\n  <lcyan>" 
+                       ~ escapeCCL(wholeInput[start..end]) ~ "</lcyan>\n  <yellow>";
+        int arrowDist = where - start; 
+        assert(arrowDist >= 0);
+        for (int dist = 0; dist < arrowDist; ++dist)
+        {
+            message ~= "-";
+        }
+        message ~= "^</yellow>";
+        return message.idup;
+    }
+
+private:
+    int _col; // column in text position that didn't parse
+    int _line; // line in input text position that didn't parse
 }
