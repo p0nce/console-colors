@@ -13,32 +13,22 @@ As it is a very competitive field, we'll try to establish some claims using reas
 ## Example
 
 ```d
+import std.stdio;
 import consolecolors;
 
 void main(string[] args)
 {
-    cwriteln;
-    cwriteln("Welcome to &gt;&gt;&gt; <yellow><on_blue> "
-           ~ "console-colors </on_blue></yellow> &lt;&lt;&lt;");
-    cwriteln;
-    cwritefln("In this library, %s are nestable thanks to a state machine.\n".yellow, 
-              " text colors ".lmagenta.on_white);
-    cwriteln;
-    cwriteln("*** FOREGROUND COLORS".white);
-    cwriteln;
-    foreach(c; availableConsoleColors)
+    try
     {
-        cwritefln("    <%s> - %8s </%s> <grey>with &lt;%s&gt; or .%s() </grey>", 
-                  c, c, c, c, c);
+        // do stuff that can throw
     }
-    cwriteln;
-    cwriteln;
-    cwriteln("*** BACKGROUND COLORS".white);
-    cwriteln;
-    foreach(c; availableConsoleColors)
+    catch(CCLException e) // An exception with a coloured message
     {
-        cwritefln("    <on_%s> <white>- %8s</white> </on_%s> "
-                ~ "<grey>with &lt;on_%s&gt; or .on_%s()</grey>", c, c, c, c, c);
+        cwritefln("<lred>Error:</lred> %s", e.msg)
+    }
+    catch(Exception e) // An uncoloured exception.
+    {
+        cwritefln("<lred>Error:</lred> %s", escapeCCL(e.msg));
     }
 }
 ```
@@ -46,6 +36,9 @@ void main(string[] args)
 ## Features
 
 - Use 16 different colors in the terminal, for foreground and background.
+
+- Escape and un-escape from Console Colors Language (CCL), in order to mix and match coloured and uncoloured exceptions in your codebase.
+  **Now you can `throw` with color information.**
 
 - One file, can be copied in your project.
 
@@ -59,17 +52,6 @@ void main(string[] args)
   `console-colors` has a color stack to restore the previously set color.
 
 - All colors have an easy shortcut like `.lmagenta` or `.white`, making it easier to add color in the first place (at the cost of your namespace).
-
-  ```d
-  try
-  {
-      // do something
-  }
-  catch(Exception e)
-  {
-      cwritefln("<lred>error:</lred> <white>%s</white>", e.msg);
-  }
-  ```
 
 - Colors can be disabled globally, with `disableConsoleColors()`.
   It is an often wanted thing in command-line tools with colors.
