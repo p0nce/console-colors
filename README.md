@@ -24,11 +24,11 @@ void main(string[] args)
     }
     catch(CCLException e) // An exception with a coloured message
     {
-        cwritefln("<lred>Error:</lred> %s", e.msg)
+        cwritefln("\n<lred>Error:</lred> %s", e.msg)
     }
     catch(Exception e) // An uncoloured exception.
     {
-        cwritefln("<lred>Error:</lred> %s", escapeCCL(e.msg));
+        cwritefln("\n<lred>Error:</lred> %s", escapeCCL(e.msg));
     }
 }
 ```
@@ -61,4 +61,4 @@ We are heading towards the ultimate console in D. Reaching for the stars here.
 You have no excuse anymore not to have colors in your terminal.
 
 
-_If it's worth having a command-line, then it's worth having colours. - Adam Smith, Wealth of Nations_
+_If it's worth having a command-line, then it's worth having colours._
