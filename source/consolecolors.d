@@ -242,7 +242,7 @@ void emitToTerminal(scope const(char)[] s) @trusted
 private:
 
 /// A global, shared state machine that does the terminal emulation and book-keeping.
-TermInterpreter g_termInterpreter = TermInterpreter.init;
+__gshared TermInterpreter g_termInterpreter = TermInterpreter.init;
 
 shared static this()
 {
