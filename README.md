@@ -63,7 +63,7 @@ You have no excuse anymore not to have colors in your terminal.
 
 ## Caveats
 
-  - Any text that goes through `cwrite` must be CCL, so uncoloured input has to be escaped with `escaleCCL`
+  - Any text that goes through `cwrite` must be CCL, so uncoloured input has to be escaped with `escapeCCL`
   - `<` needs to be escaped with the entity `&lt;`
   - `>` needs to be escaped with the entity `&gt;`
   - `&` needs to be escaped with the entity `&amp;`
