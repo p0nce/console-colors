@@ -858,23 +858,26 @@ private:
         static immutable ubyte[16] TRANSLATE_WINATTR = [ 0,  4,  2,  6, 1,  5,  3, 7, 8, 12, 10, 14, 9, 13, 11, 15 ];
     }
 
-    TermColor convertWinattrToTermColor(int attrUnmasked, bool bg)
+    version(Windows)
     {
-        if (bg) attrUnmasked = attrUnmasked >>> 4;
-        return cast(TermColor) TRANSLATE_WINATTR[attrUnmasked & 15];
-    }
-
-    /// Return a mask representing windows attribute for color c.
-    int convertTermColorToWinAttr(TermColor c, bool bg)
-    {
-        assert (c != TermColor.unknown);
-        if (c == TermColor.initial)
-            return bg ? _initialBackgroundColor : _initialForegroundColor;
-        else
+        TermColor convertWinattrToTermColor(int attrUnmasked, bool bg)
         {
-            int res = TRANSLATE_WINATTR[cast(ubyte)c];
-            if (bg) res = res << 4;
-            return res;
+            if (bg) attrUnmasked = attrUnmasked >>> 4;
+            return cast(TermColor) TRANSLATE_WINATTR[attrUnmasked & 15];
+        }
+
+        /// Return a mask representing windows attribute for color c.
+        int convertTermColorToWinAttr(TermColor c, bool bg)
+        {
+            assert (c != TermColor.unknown);
+            if (c == TermColor.initial)
+                return bg ? _initialBackgroundColor : _initialForegroundColor;
+            else
+            {
+                int res = TRANSLATE_WINATTR[cast(ubyte)c];
+                if (bg) res = res << 4;
+                return res;
+            }
         }
     }
 
