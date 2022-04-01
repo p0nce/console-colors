@@ -19,7 +19,7 @@ version(Posix) import core.sys.posix.unistd;
 
 public:
 
-/// In input language, cannot more than `CCL_MAX_NESTED_TAGS` levels of nested tags.
+/// In input language, cannot have more than `CCL_MAX_NESTED_TAGS` levels of nested tags.
 enum int CCL_MAX_NESTED_TAGS = 32;
 
 /// An exception whose text is coloured, it follows the CCL language.
@@ -227,6 +227,7 @@ void emitToTerminal(scope const(char)[] s) @trusted
     }
     catch (CCLParseException e)
     {
+        // Note: this flatten the message, pinpointing the offending characters.
         throw new CCLException(e.nicerMessage(s));
     }
     catch(CCLException e)
@@ -382,7 +383,8 @@ private:
     void enterTag(const(char)[] tagName, int inputPos)
     {
         if (_tagStackIndex >= CCL_MAX_NESTED_TAGS)
-            throw new CCLException("Tag stack is full. Try using less color tags.");
+            throw new CCLParseException(inputPos,
+                                        format("Tag stack is full, can't push <lcyan>&lt;%s&gt;</lcyan>. Perhaps you forgot a closing tag?", tagName));
 
         // dup top of stack, set foreground color
         _stack[_tagStackIndex + 1] = _stack[_tagStackIndex]; 
@@ -596,13 +598,12 @@ private:
                     if (peek() == '>')
                     {
                         next;
-
                         r.type = TokenType.tagOpenClose;
                         r.text = tagName;
                         return r;
                     }
                     else
-                        throw new CCLException("Expected '&gt;' after '/'");
+                        throw new CCLParseException(inputPos, "Expected '&gt;' after '/'");
                 }
                 else if (ch == '>')
                 {
