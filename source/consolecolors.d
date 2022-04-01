@@ -58,9 +58,13 @@ bool isValidCCL(const(char)[] text) nothrow @trusted
         term.interpret(text);
         return true;
     }
-    catch(CCLException e)
+    catch(CCLParseException e)
     {
         return false;
+    }
+    catch(CCLException e)
+    {
+        assert(false); // CCL parse must only throw errors with column information, and offending chars.
     }
     catch(Exception e)
     {
