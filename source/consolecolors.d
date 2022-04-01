@@ -607,7 +607,7 @@ private:
                         return r;
                     }
                     else
-                        throw new CCLParseException(inputPos, "Expected '&gt;' after '/'");
+                        throw new CCLParseException(inputPos, "expected '&gt;' after '/'.");
                 }
                 else if (ch == '>')
                 {
@@ -618,10 +618,13 @@ private:
                     return r;
                 }
                 else
-                {   
+                {
+                    if (!isValidTagnameCharacter(ch))
+                    {
+                        throw new CCLParseException(inputPos, "invalid character in tag name.");
+                    }
                     next;
                 }
-                // TODO: check chars are valid in HTML tags
             }
             if (closeTag)
                 throw new CCLParseException(inputPos, format("unterminated tag <lcyan>&lt;/%s&gt;</lcyan>", charsSincePos(startOfTagName)));
@@ -972,7 +975,7 @@ unittest
     assert(!isValidCCL("my input <"));
 
     // INVALID: accidental >
-    assert(!isValidCCL("done > todo"));
+    assert(!isValidCCL("done > to do"));
 
     // INVALID: input ending on </
     assert(!isValidCCL("my input </"));
@@ -998,6 +1001,9 @@ unittest
 
     // INVALID: unknown entity name
     assert(!isValidCCL("&unknown;"));
+
+    // INVALID: invalid character name
+    assert(!isValidCCL("<ah@m>ok</ah@m>"));
 }
 
 /// When input text doesn't parse, it throws.
@@ -1074,3 +1080,15 @@ private:
     int _col; // column in text position that didn't parse
     int _line; // line in input text position that didn't parse
 }
+
+bool isValidTagnameCharacter(char ch) pure @nogc
+{
+    if (ch >= 'a' && ch <= 'z')
+        return true;
+    if (ch >= 'A' && ch <= 'Z')
+        return true;
+    if (ch >= '0' && ch <= '9')
+        return true;
+    return false;
+}
+
