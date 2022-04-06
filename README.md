@@ -24,7 +24,7 @@ void main(string[] args)
     }
     catch(CCLException e) // An exception with a coloured message
     {
-        cwritefln("\n<lred>Error:</lred> %s", e.msg)
+        cwritefln("\n<lred>Error:</lred> %s", e.msg);
     }
     catch(Exception e) // An uncoloured exception.
     {
