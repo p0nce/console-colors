@@ -1089,6 +1089,8 @@ bool isValidTagnameCharacter(char ch) pure @nogc
         return true;
     if (ch >= '0' && ch <= '9')
         return true;
+    if (ch == '-' || ch == '_')
+        return true;
     return false;
 }
 
