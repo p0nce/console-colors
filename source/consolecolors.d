@@ -11,6 +11,8 @@ module consolecolors;
 import core.stdc.stdio: printf, FILE, fwrite, fflush, fputc;
 import std.stdio : File, stdout;
 import std.string: format, replace;
+import std.process: environment;
+
 version(Windows) import core.sys.windows.windows;
 version(Posix) import core.sys.posix.unistd;
 
@@ -721,13 +723,15 @@ enum TermColor : int
 // - setBackgroundColor(TermColor color)
 struct Terminal
 {
-nothrow @nogc @safe:
+nothrow @safe:
 
     // Initialize the terminal.
     // Return: success. If false, don't use this instance.
     bool initialize() @trusted
     {
-        version(Posix) 
+        _useVT100 = terminalSupportsVT100Codes();
+
+        if (_useVT100)
         {
             _initialForegroundColor = TermColor.initial;
             _initialBackgroundColor = TermColor.initial;
@@ -760,14 +764,14 @@ nothrow @nogc @safe:
             static assert(false);
     }
 
-    ~this() @trusted
+    ~this() @nogc @trusted
     {
         // Note that this is also destructed if constructor failed (.init)
         // so have to handle it anyway like most D objects.
         if (!_initialized)
             return;
 
-        version(Posix)
+        if (_useVT100)
         {
             printf("\x1B[0m");
         }
@@ -781,7 +785,7 @@ nothrow @nogc @safe:
     }
 
     void setForegroundColor(TermColor color, 
-                            scope void delegate() nothrow @nogc callThisBeforeChangingColor  ) @trusted
+                            scope void delegate() nothrow @nogc callThisBeforeChangingColor  ) @nogc @trusted
     {
         assert(color != TermColor.unknown);
 
@@ -794,7 +798,7 @@ nothrow @nogc @safe:
 
         if (callThisBeforeChangingColor)
             callThisBeforeChangingColor();
-        version(Posix)
+        if (_useVT100)
         {
             int code = convertTermColorToVT100Attr(color, false);
             printf("\x1B[%dm", code);
@@ -809,7 +813,7 @@ nothrow @nogc @safe:
             static assert(false);
     }
 
-    void setBackgroundColor(TermColor color, scope void delegate() nothrow @nogc callThisBeforeChangingColor) @trusted
+    void setBackgroundColor(TermColor color, scope void delegate() nothrow @nogc callThisBeforeChangingColor) @nogc @trusted
     {
         assert(color != TermColor.unknown);
 
@@ -822,7 +826,7 @@ nothrow @nogc @safe:
 
         if (callThisBeforeChangingColor)
             callThisBeforeChangingColor();
-        version(Posix)
+        if (_useVT100)
         {
             int code = convertTermColorToVT100Attr(color, true);
             printf("\x1B[%dm", code);
@@ -841,6 +845,9 @@ private:
 
     // Successfully initialized.
     bool _initialized = false;
+
+    // If we should use VT100 sequences (always true, except in Windows it can be false).
+    bool _useVT100;
 
     // At initialization, find those.
     TermColor _initialForegroundColor = TermColor.unknown;
@@ -868,14 +875,14 @@ private:
 
     version(Windows)
     {
-        TermColor convertWinattrToTermColor(int attrUnmasked, bool bg)
+        TermColor convertWinattrToTermColor(int attrUnmasked, bool bg) @nogc
         {
             if (bg) attrUnmasked = attrUnmasked >>> 4;
             return cast(TermColor) TRANSLATE_WINATTR[attrUnmasked & 15];
         }
 
         /// Return a mask representing windows attribute for color c.
-        int convertTermColorToWinAttr(TermColor c, bool bg)
+        int convertTermColorToWinAttr(TermColor c, bool bg) @nogc
         {
             assert (c != TermColor.unknown);
             if (c == TermColor.initial)
@@ -889,7 +896,7 @@ private:
         }
     }
 
-    int convertTermColorToVT100Attr(TermColor c, bool bg)
+    int convertTermColorToVT100Attr(TermColor c, bool bg) @nogc
     {
         assert (c != TermColor.unknown);
 
@@ -916,7 +923,7 @@ private:
 // Terminal is only valid to use on an actual console device or terminal
 // handle. You should not attempt to construct a Terminal instance if this
 // returns false.
-bool stdoutIsTerminal() @nogc @trusted
+bool stdoutIsTerminal() @trusted
 {
     version(Posix) 
     {
@@ -924,6 +931,9 @@ bool stdoutIsTerminal() @nogc @trusted
     } 
     else version(Windows) 
     {
+        if (terminalSupportsVT100Codes)
+            return true;
+
         HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
         if (hConsole == INVALID_HANDLE_VALUE)
             return false;
@@ -1094,3 +1104,29 @@ bool isValidTagnameCharacter(char ch) pure @nogc
     return false;
 }
 
+version(Windows)
+{
+    bool terminalSupportsVT100Codes() @safe
+    {
+        try
+        {   
+            if (environment.get("TERM") !is null)
+            {
+                // Assume we are supporting VT100 here.
+                // This covers Git Bash with MinTTY (See Issue #7)
+                return environment.get("TERM") == "xterm";
+            }
+        }
+        catch(Exception e)
+        {
+        }
+        return false;
+    }
+}
+else
+{
+    bool terminalSupportsVT100Codes()
+    {
+        return true;
+    }
+}
