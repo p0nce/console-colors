@@ -761,7 +761,7 @@ nothrow @safe:
                 return false;
         }
         else
-            static assert(false);
+            assert(false);
     }
 
     ~this() @nogc @trusted
@@ -781,7 +781,7 @@ nothrow @safe:
             setBackgroundColor(_initialBackgroundColor, null);
         }
         else
-            static assert(false);
+            assert(false);
     }
 
     void setForegroundColor(TermColor color, 
@@ -810,7 +810,7 @@ nothrow @safe:
             _currentAttr = attr;
         }
         else
-            static assert(false);
+            assert(false);
     }
 
     void setBackgroundColor(TermColor color, scope void delegate() nothrow @nogc callThisBeforeChangingColor) @nogc @trusted
@@ -838,7 +838,7 @@ nothrow @safe:
             _currentAttr = attr;
         }
         else
-            static assert(false);
+            assert(false);
     }
 
 private:
