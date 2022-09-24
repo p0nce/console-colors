@@ -1110,11 +1110,14 @@ version(Windows)
     {
         try
         {   
-            if (environment.get("TERM") !is null)
+            string term = environment.get("TERM");
+            if (term !is null)
             {
                 // Assume we are supporting VT100 here.
                 // This covers Git Bash with MinTTY (See Issue #7)
-                return environment.get("TERM") == "xterm";
+                // Its usable TERM variable can be these according to
+                // https://wiki.archlinux.org/title/Xterm#TERM_Environmental_Variable
+                return term == "xterm" || term == "xterm-256color";
             }
         }
         catch(Exception e)
