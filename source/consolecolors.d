@@ -464,7 +464,7 @@ private:
         if (_tagStackIndex <= 0)
             throw new CCLParseException(inputPos, format("unexpected <lcyan>&lt;/%s&gt;</lcyan> closing tag.", tagName));
         
-        if (stackTop().name != tagName)
+        if (tagName != "" && stackTop().name != tagName)
         {
             throw new CCLParseException(inputPos, 
                 format("<lcyan>&lt;%s&gt;</lcyan> doesn't match closing tag <lcyan>&lt;/%s&gt;</lcyan>",
@@ -956,6 +956,9 @@ unittest
     // VALID: open-closed tag.
     assert(isValidCCL( "<autonomous/>"));
 
+    // VALID: universal closing tag </>.
+    assert(isValidCCL( "<green>text</>"));
+
     // VALID: nested.
     assert(isValidCCL( "<green>text<red>lol</red></green>"));
 
@@ -974,6 +977,7 @@ unittest
 
     // INVALID: unexpected closing tag
     assert(!isValidCCL("text</blue>"));
+    assert(!isValidCCL("text</>"));
 
     // INVALID: unclosed opening tag
     assert(!isValidCCL("text<blue>"));
@@ -999,6 +1003,7 @@ unittest
     // INVALID: unterminated tag
     assert(!isValidCCL("<important"));
     assert(!isValidCCL("</important"));
+    assert(!isValidCCL("</"));
 
     // INVALID: expected '>' after '/'
     assert(!isValidCCL("<important/"));

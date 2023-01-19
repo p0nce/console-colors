@@ -26,6 +26,11 @@ void main(string[] args)
             cwritefln("    <on_%s> <white>- %8s</white> </on_%s> "
                     ~ "<grey>with &lt;on_%s&gt; or .on_%s()</grey>", c, c, c, c, c);
         }
+
+        cwriteln;
+        cwriteln("*** UNIVERSAL CLOSING TAG".white);
+        cwriteln;
+        cwriteln("    Closing <lgreen>nested <lcyan>tags <lmagenta>with just</><yellow> &lt;/&gt;</></></>");
     }
     catch(CCLException e) // An exception with a coloured message
     {
