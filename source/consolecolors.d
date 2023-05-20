@@ -78,7 +78,7 @@ bool isValidCCL(const(char)[] text) nothrow @trusted
 /// '<', '>' and '&' are rewritten as entities.
 /// Note: exception can have CCL text or non-CCL text.
 ///       CCL text must be written with `cwrite`.
-const(char)[] escapeCCL(scope const(char)[] text) nothrow @trusted
+const(char)[] escapeCCL(return scope const(char)[] text) nothrow @trusted
 {
     // PERF: this is bad.
     return text.replace("&", "&amp;")
