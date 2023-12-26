@@ -1,5 +1,6 @@
 # console-colors
 
+![console-colors cheat sheet](cheat-sheet.png)
 
 ## Goals
 
