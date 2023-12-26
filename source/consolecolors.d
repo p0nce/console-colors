@@ -78,12 +78,13 @@ bool isValidCCL(const(char)[] text) nothrow @trusted
 /// '<', '>' and '&' are rewritten as entities.
 /// Note: exception can have CCL text or non-CCL text.
 ///       CCL text must be written with `cwrite`.
-const(char)[] escapeCCL(scope const(char)[] text) nothrow @trusted
+const(char)[] escapeCCL(const(char)[] text) nothrow @trusted
 {
     // PERF: this is bad.
-    return text.replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;");
+    string textcopy = text.idup;
+    return textcopy.replace("&", "&amp;")
+                   .replace("<", "&lt;")
+                   .replace(">", "&gt;");
 }
 
 pure nothrow @safe
@@ -1136,5 +1137,34 @@ else
     bool terminalSupportsVT100Codes()
     {
         return true;
+    }
+}
+
+unittest
+{
+    try
+    {
+        cwriteln("\n<white>--- COLORS</white>\n");
+        cwriteln(`  <on_grey><black>black</black></on_grey>     <grey>grey</grey>      <white> <on_black>on_black</on_black></white>     <on_grey><black>on_grey</black></on_grey>`);
+        cwriteln(`  <red>red</red>       <lred>lred</lred>       <on_red><white>on_red</white></on_red>       <on_lred><black>on_lred</black></on_lred>`);
+        cwriteln(`  <green>green</green>     <lgreen>lgreen</lgreen>     <on_green><white>on_green</white></on_green>     <on_lgreen><black>on_lgreen</black></on_lgreen>`);
+        cwriteln(`  <orange>orange</orange>    <yellow>yellow</yellow>     <on_orange><white>on_orange</white></on_orange>    <on_yellow><black>on_yellow</black></on_yellow>`);
+        cwriteln(`  <blue>blue</blue>      <lblue>lblue</lblue>      <on_blue><white>on_blue</white></on_blue>      <on_lblue><black>on_lblue</black></on_lblue>`);
+        cwriteln(`  <magenta>magenta</magenta>   <lmagenta>lmagenta</lmagenta>   <on_magenta><white>on_magenta</white></on_magenta>   <on_lmagenta><black>on_lmagenta</black></on_lmagenta>`);
+        cwriteln(`  <cyan>cyan</cyan>      <lcyan>lcyan</lcyan>      <on_cyan><white>on_cyan</white></on_cyan>      <on_lcyan><black>on_lcyan</black></on_lcyan>`);
+        cwriteln(`  <lgrey>lgrey</lgrey>     <white>white</white>      <on_lgrey><white>on_lgrey</white></on_lgrey>     <on_white><black>on_white</black></on_white>`);
+        cwriteln("\n<white>--- HOW TO USE</white>\n");
+        cwriteln(`   <lmagenta>// UFCS style</lmagenta>`);
+        cwriteln(`   cwriteln<yellow>(</yellow><green>"my text"</green>.lred.on_blue<yellow>);</yellow>`);
+        cwriteln(`   <lred><on_blue>my text</on_blue></lred>`);
+        cwriteln(``);
+        cwriteln(`   <lmagenta>// XML anchors style (CCL)</lmagenta>`);
+        cwriteln(`   cwritefln<yellow>(</yellow><green>"my &lt;orange&gt;name&lt;/orange&gt; is %s"</green>, <green>"&lt;lblue&gt;blob&lt;/lblue&gt;"</green><yellow>);</yellow>`);
+        cwritefln("   my <orange>name</orange> is %s", "<lblue>blob</lblue>");
+        cwriteln(``);
+        cwriteln(``);
+    }
+    catch(Exception e)
+    {
     }
 }
