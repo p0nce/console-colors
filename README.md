@@ -1,7 +1,5 @@
 # console-colors
 
-![console-colors cheat sheet](cheat-sheet.png)
-
 ## Goals
 
 `console-colors` is an attempt towards making the **ultimate zero-hassle console color library for D.**
@@ -33,6 +31,11 @@ void main(string[] args)
     }
 }
 ```
+
+## Cheat Sheet
+
+![console-colors cheat sheet](cheat-sheet.png)
+
 
 ## Features
 
