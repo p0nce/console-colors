@@ -777,7 +777,8 @@ nothrow @safe:
     // Return: success. If false, don't use this instance.
     bool initialize(bool isStdOut) @trusted
     {
-        _useVT100 = terminalSupportsVT100Codes();
+        // Note: recent Windows can use VT100 code by default it seems.
+        _useVT100 = terminalSupportsVT100Codes();        
 
         if (_useVT100)
         {
@@ -785,6 +786,7 @@ nothrow @safe:
             _initialBackgroundColor = TermColor.initial;
             _currentForegroundColor = _initialForegroundColor;
             _currentBackgroundColor = _initialBackgroundColor;
+            fileHandleForWrite = !isStdOut ? core.stdc.stdio.stderr : core.stdc.stdio.stdout;
             return true;
         }
         else version(Windows)
@@ -821,10 +823,10 @@ nothrow @safe:
 
         if (_useVT100)
         {
-            printf("\x1B[0m");
+            fprintf(fileHandleForWrite, "\x1B[0m");
         }
         else version(Windows)
-        {            
+        {
             setForegroundColor(_initialForegroundColor, null);
             setBackgroundColor(_initialBackgroundColor, null);
         }
@@ -849,7 +851,7 @@ nothrow @safe:
         if (_useVT100)
         {
             int code = convertTermColorToVT100Attr(color, false);
-            printf("\x1B[%dm", code);
+            fprintf(fileHandleForWrite, "\x1B[%dm", code);
         }
         else version(Windows)
         {
@@ -877,7 +879,7 @@ nothrow @safe:
         if (_useVT100)
         {
             int code = convertTermColorToVT100Attr(color, true);
-            printf("\x1B[%dm", code);
+            fprintf(fileHandleForWrite, "\x1B[%dm", code);
         }
         else version(Windows)
         {
@@ -896,6 +898,7 @@ private:
 
     // If we should use VT100 sequences (always true, except in Windows it can be false).
     bool _useVT100;
+    FILE* fileHandleForWrite; // only used if _useVT100 == true
 
     // At initialization, find those.
     TermColor _initialForegroundColor = TermColor.unknown;
