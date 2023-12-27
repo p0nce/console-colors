@@ -8,8 +8,8 @@
 */
 module consolecolors;
 
-import core.stdc.stdio: printf, FILE, fwrite, fflush, fputc;
-import std.stdio : File, stdout;
+import core.stdc.stdio;
+import std.stdio : File, stdout, stderr;
 import std.string: format, replace;
 import std.process: environment;
 
@@ -180,7 +180,7 @@ string color(const(char)[] text, const(char)[] color) pure @safe
 /// - To pass '<' as text and not a tag, use &lt;
 /// - To pass '>' as text and not a tag, use &gt;
 /// - To pass '&' as text not an entity, use &amp;
-void cwrite(T...)(T args)
+void cwrite(T...)(T args) @trusted              if (T.length == 0 || !(is(T[0] == File)))
 {
     import std.conv : to;
 
@@ -188,34 +188,62 @@ void cwrite(T...)(T args)
     string s = "";
     foreach(arg; args)
         s ~= to!string(arg);
-    emitToTerminal(s);
+    emitToTerminal(stdout, s);
+}
+///ditto
+void cwrite(T...)(File f, T args)
+{
+    import std.conv : to;
+
+    // PERF: meh
+    string s = "";
+    foreach(arg; args)
+        s ~= to!string(arg);
+    emitToTerminal(f, s);
 }
 
 ///ditto
-void cwriteln(T...)(T args)
+void cwriteln(T...)(T args)                     if (T.length == 0 || !(is(T[0] == File)))
 {
     // Most general instance
     cwrite(args, '\n');
 }
+///ditto
+void cwriteln(T...)(File f, T args)
+{
+    f.cwrite(args, '\n');
+}
 
 ///ditto
-void cwritef(Char, T...)(in Char[] fmt, T args)
+void cwritef(Char, T...)(in Char[] fmt, T args) if (T.length == 0 || !(is(T[0] == File)))
 {
     import std.string : format;
     auto s = format(fmt, args);
     cwrite(s);
 }
+void cwritef(Char, T...)(File f, in Char[] fmt, T args)
+{
+    import std.string : format;
+    auto s = format(fmt, args);
+    f.cwrite(s);
+}
 
 ///ditto
-void cwritefln(Char, T...)(in Char[] fmt, T args)
+void cwritefln(Char, T...)(in Char[] fmt, T args) if (T.length == 0 || !(is(T[0] == File)))
 {
     cwritef(fmt ~ "\n", args);
+}
+///ditto
+void cwritefln(Char, T...)(File f, in Char[] fmt, T args)
+{
+    f.cwritef(fmt ~ "\n", args);
 }
 
 /// Disable output console colors.
 void disableConsoleColors()
 {
-    g_termInterpreter.disableColors();
+    g_termInterpreterStdout.disableColors();
+    g_termInterpreterStdout.disableColors();
 }
 
     
@@ -225,12 +253,27 @@ private:
 
 // Implementation of `emitToTerminal`. This is a combined lexer/parser/emitter.
 // It can throw Exception in case of misformat of the input text.
-void emitToTerminal(scope const(char)[] s) @trusted
+void emitToTerminal(File f, scope const(char)[] s) @trusted
 {
-    TermInterpreter* term = &g_termInterpreter;
+    TermInterpreter* term = null;
+    if (f.getFP() == core.stdc.stdio.stdout)
+    {
+        term = &g_termInterpreterStdout;
+    }
+    else if (f.getFP() == core.stdc.stdio.stderr)
+    {
+        term = &g_termInterpreterStderr;
+    }
+    else
+    {
+        // If you fail here, you used a colored write `cwritexxx` with a File that isn't
+        // either stderr or stdout. This isn't supported.
+        assert(false);
+    }
+
     try
-    {        
-        term.interpret(s);  
+    {
+        term.interpret(s);
     }
     catch (CCLParseException e)
     {
@@ -247,31 +290,35 @@ void emitToTerminal(scope const(char)[] s) @trusted
     }
 }
 
-private:
-
-/// A global, shared state machine that does the terminal emulation and book-keeping.
-__gshared TermInterpreter g_termInterpreter = TermInterpreter.init;
+/// Two global, shared state machine that does the terminal emulation and book-keeping.
+__gshared TermInterpreter g_termInterpreterStdout = TermInterpreter.init;
+__gshared TermInterpreter g_termInterpreterStderr = TermInterpreter.init;
 
 shared static this()
 {
-    g_termInterpreter.initialize();
+    g_termInterpreterStdout.initialize(true);
+    g_termInterpreterStderr.initialize(false);
 }
 
 shared static ~this()
 {
-    destroy(g_termInterpreter);
+    destroy(g_termInterpreterStderr);
+    destroy(g_termInterpreterStdout);
 }
 
 struct TermInterpreter
 {
-    void initialize()
+    void initialize(bool isStdout)
     {
-        if (stdoutIsTerminal)
+        if (stdhandleIsTerminal(isStdout))
         {
-            if (_terminal.initialize())
+            if (_terminal.initialize(isStdout))
             {
                 _enableTerm = true;
-                cstdout = stdout.getFP();
+                if (isStdout) 
+                    fileHandleForWrite = stdout.getFP();
+                else
+                    fileHandleForWrite = stderr.getFP();
             }
         }
     }
@@ -338,7 +385,7 @@ struct TermInterpreter
                         case TokenType.text:
                         {
                             if (_enableTerm)
-                                printf("%.*s", cast(int)token.text.length, token.text.ptr);
+                                fprintf(fileHandleForWrite, "%.*s", cast(int)token.text.length, token.text.ptr);
                             break;
                         }
 
@@ -363,7 +410,7 @@ private:
     bool _enableTerm = false;
     Terminal _terminal;
 
-    FILE* cstdout;
+    FILE* fileHandleForWrite; // can be only a FILE* for stdout or stderr
 
     // Style/Tag stack
     static struct Tag
@@ -440,14 +487,14 @@ private:
     {
         stackTop().fg = fg;
         if (_enableTerm)
-            _terminal.setForegroundColor(stackTop().fg, &flushStdoutIfWindows);
+            _terminal.setForegroundColor(stackTop().fg, &flushFileIfWindows);
     }
 
     void setBackground(TermColor bg) nothrow @nogc
     {
         stackTop().bg = bg;
         if (_enableTerm)
-            _terminal.setBackgroundColor(stackTop().bg, &flushStdoutIfWindows);
+            _terminal.setBackgroundColor(stackTop().bg, &flushFileIfWindows);
     }
 
     void applyStyleOnTop()
@@ -455,8 +502,8 @@ private:
         if (_enableTerm)
         {
             // PERF: do this at once.
-            _terminal.setForegroundColor(stackTop().fg, &flushStdoutIfWindows);
-            _terminal.setBackgroundColor(stackTop().bg, &flushStdoutIfWindows);
+            _terminal.setForegroundColor(stackTop().fg, &flushFileIfWindows);
+            _terminal.setBackgroundColor(stackTop().bg, &flushFileIfWindows);
         }
     }
     
@@ -546,14 +593,14 @@ private:
         assert(inputPos <= input.length);
     }
 
-    void flushStdoutIfWindows() nothrow @nogc
+    void flushFileIfWindows() nothrow @nogc
     {
         version(Windows)
         {
             //  On windows, because the C stdlib is buffered, we need to flush()
             //  before changing color else text is going to be the next color.
-            if (cstdout != null)
-                fflush(cstdout);
+            if (fileHandleForWrite != null)
+                fflush(fileHandleForWrite);
         }
     }
 
@@ -728,7 +775,7 @@ nothrow @safe:
 
     // Initialize the terminal.
     // Return: success. If false, don't use this instance.
-    bool initialize() @trusted
+    bool initialize(bool isStdOut) @trusted
     {
         _useVT100 = terminalSupportsVT100Codes();
 
@@ -743,7 +790,7 @@ nothrow @safe:
         else version(Windows)
         {
             // saves console attributes
-            _console = GetStdHandle(STD_OUTPUT_HANDLE);
+            _console = GetStdHandle(isStdOut ? STD_OUTPUT_HANDLE : STD_ERROR_HANDLE);
             if (_console == null)
                 return false;
             CONSOLE_SCREEN_BUFFER_INFO consoleInfo;
@@ -924,18 +971,18 @@ private:
 // Terminal is only valid to use on an actual console device or terminal
 // handle. You should not attempt to construct a Terminal instance if this
 // returns false.
-bool stdoutIsTerminal() @trusted
+bool stdhandleIsTerminal(bool isStdout) @trusted
 {
     version(Posix) 
     {
-        return cast(bool) isatty(1);
+        return cast(bool) isatty(isStdout ? 1 : 2);
     } 
     else version(Windows) 
     {
         if (terminalSupportsVT100Codes)
             return true;
 
-        HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+        HANDLE hConsole = GetStdHandle(isStdout ? STD_OUTPUT_HANDLE : STD_ERROR_HANDLE);
         if (hConsole == INVALID_HANDLE_VALUE)
             return false;
 
@@ -1162,6 +1209,12 @@ unittest
         cwriteln(`   cwritefln<yellow>(</yellow><green>"my &lt;orange&gt;name&lt;/orange&gt; is %s"</green>, <green>"&lt;lblue&gt;blob&lt;/lblue&gt;"</green><yellow>);</yellow>`);
         cwritefln("   my <orange>name</orange> is %s", "<lblue>blob</lblue>");
         cwriteln(``);
+        cwriteln(`   <lmagenta>// Writing to stderr (only stdout and stderr are allowed)</lmagenta>`);
+        cwriteln(`   stderr.cwritefln<yellow>(</yellow><green>"&lt;lred&gt;error:&lt;/lred&gt; you failed."</green><yellow>);</yellow>`);
+        () @trusted /* stderr() isn't @safe */
+        {
+            stderr.cwritefln("   <lred>error:</lred> you failed.");
+        }();
         cwriteln(``);
     }
     catch(Exception e)
