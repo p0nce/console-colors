@@ -31,6 +31,21 @@ void main(string[] args)
         cwriteln("*** UNIVERSAL CLOSING TAG".white);
         cwriteln;
         cwriteln("    Closing <lgreen>nested <lcyan>tags <lmagenta>with just</><yellow> &lt;/&gt;</></></>");
+        cwriteln;
+        cwriteln("*** ENABLE UTF-8 codepage on Windows".white);
+        cwriteln;
+        cwriteln("    Just call <cyan>enableConsoleUTF8()</>!");
+        cwriteln;
+        cwriteln("        <lred>❎ Before enable UTF-8 🤷🏼</lred>");
+        enableConsoleUTF8();
+        cwriteln("        <lgreen>✔️ Unicode 🆗</lgreen>");
+        cwriteln;
+        cwriteln("*** DISABLE CONSOLE COLORS".white);
+        cwriteln;
+        cwriteln("    Just call <cyan>disableConsoleColors()</> to disable colors.");
+        cwriteln;
+        disableConsoleColors();
+        cwriteln(`    No more <red>colors</red> 😭 but UTF-8 still enabled.`);
     }
     catch(CCLException e) // An exception with a coloured message
     {

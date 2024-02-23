@@ -8,7 +8,6 @@ It is meant as a spiritual successor of the `colorize` [package](https://github.
 
 As it is a very competitive field, we'll try to establish some claims using reasoning that this thing is better than some other related things.
 
-
 ## Example
 
 ```d
@@ -57,6 +56,8 @@ void main(string[] args)
 
 - All colors have an easy shortcut like `.lmagenta` or `.white`, making it easier to add color in the first place (at the cost of your namespace).
 
+- UTF-8 can be enabled on Windows, with `enableConsoleUTF8()`.
+
 - Colors can be disabled globally, with `disableConsoleColors()`.
   It is an often wanted thing in command-line tools with colors.
   Colors are also disabled if `stdout` isn't a terminal, or if the terminal initialization failed.
@@ -64,12 +65,17 @@ void main(string[] args)
 We are heading towards the ultimate console in D. Reaching for the stars here.
 You have no excuse anymore not to have colors in your terminal.
 
+## Changelog
+
+- **v1.3** Windows VT-100 detection, skips the emulation layer. New `enableConsoleUTF8()` call to set UTF-8 on Windows.
+
+- **v1.2** stderr support with `stderr.cwritexxx("some CCL text");`
 
 ## Caveats
 
-  - Any text that goes through `cwrite` must be CCL, so uncoloured input has to be escaped with `escapeCCL`
-  - `<` needs to be escaped with the entity `&lt;`
-  - `>` needs to be escaped with the entity `&gt;`
-  - `&` needs to be escaped with the entity `&amp;`
+  - Any text that goes through `cwrite` must be CCL, so uncoloured input has to be escaped with `escapeCCL`. If you forget this, you will get a nice coloured `CCLException` that points out the issue.
+  - `<` **MUST** be escaped with the entity `&lt;`
+  - `>` **MUST** be escaped with the entity `&gt;`
+  - `&` **MUST** be escaped with the entity `&amp;`
 
 _If it's worth having a command-line, then it's worth having colours._

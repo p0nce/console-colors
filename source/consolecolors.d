@@ -243,10 +243,19 @@ void cwritefln(Char, T...)(File f, in Char[] fmt, T args)
 void disableConsoleColors()
 {
     g_termInterpreterStdout.disableColors();
-    g_termInterpreterStdout.disableColors();
+    g_termInterpreterStderr.disableColors();
 }
 
-    
+/// Make sure you can cwrite to the console using UTF-8.
+/// This is only typically required on Windows, but can 
+/// be called from other OS too.
+void enableConsoleUTF8()
+{
+    g_termInterpreterStdout.enableUTF8();
+    g_termInterpreterStderr.enableUTF8();
+}
+
+
 // PRIVATE PARTS API START HERE
 private:
 
@@ -323,18 +332,24 @@ struct TermInterpreter
         }
     }
 
+    ~this() pure
+    {
+    }
+
     void initializeJustForParsing()
     {
         _enableTerm = false;
     }
 
-    ~this() pure
-    {
-    }
-
     void disableColors()
     {
-        _enableTerm = false;
+        _enableColors = false;
+    }
+
+    void enableUTF8()
+    {
+        if (_enableTerm)
+            _terminal.enableUTF8();
     }
 
     /// Moves the interpreter forward, eventually do actions.
@@ -407,8 +422,13 @@ struct TermInterpreter
     }
 
 private:
+
+    // if true, _terminal has been successfully initialized and can be used for terminal commands.
     bool _enableTerm = false;
     Terminal _terminal;
+
+    // if true, colors will be emitted if given the occasion (_enableTerm being also true).
+    bool _enableColors = true;
 
     FILE* fileHandleForWrite; // can be only a FILE* for stdout or stderr
 
@@ -486,20 +506,20 @@ private:
     void setForeground(TermColor fg) nothrow @nogc
     {
         stackTop().fg = fg;
-        if (_enableTerm)
+        if (_enableTerm && _enableColors)
             _terminal.setForegroundColor(stackTop().fg, &flushFileIfWindows);
     }
 
     void setBackground(TermColor bg) nothrow @nogc
     {
         stackTop().bg = bg;
-        if (_enableTerm)
+        if (_enableTerm && _enableColors)
             _terminal.setBackgroundColor(stackTop().bg, &flushFileIfWindows);
     }
 
     void applyStyleOnTop()
     {
-        if (_enableTerm)
+        if (_enableTerm && _enableColors)
         {
             // PERF: do this at once.
             _terminal.setForegroundColor(stackTop().fg, &flushFileIfWindows);
@@ -777,16 +797,18 @@ nothrow @safe:
     // Return: success. If false, don't use this instance.
     bool initialize(bool isStdOut) @trusted
     {
-        // Note: recent Windows can use VT100 code by default it seems.
-        _useVT100 = terminalSupportsVT100Codes();        
+        // If we can tell early on that VT100 is enabled, use it.
+        _useVT100 = terminalSupportsVT100Codes();
 
         if (_useVT100)
         {
+        useVT100:
             _initialForegroundColor = TermColor.initial;
             _initialBackgroundColor = TermColor.initial;
             _currentForegroundColor = _initialForegroundColor;
             _currentBackgroundColor = _initialBackgroundColor;
             fileHandleForWrite = !isStdOut ? core.stdc.stdio.stderr : core.stdc.stdio.stdout;
+            _initialized = true;
             return true;
         }
         else version(Windows)
@@ -805,6 +827,21 @@ nothrow @safe:
 
                 _currentForegroundColor = _initialForegroundColor;
                 _currentBackgroundColor = _initialBackgroundColor;
+
+                // Also save current codepage
+                _initialCodepage = GetConsoleOutputCP(); 
+
+                // Support VT-100? Second chance here, use it instead.
+                DWORD mode;
+                if (0 != GetConsoleMode(_console, &mode))
+                {
+                    if (mode & ENABLE_VIRTUAL_TERMINAL_PROCESSING)
+                    {
+                        _useVT100 = true;
+                        goto useVT100;
+                    }
+                }
+                _initialized = true;
                 return true;
             }
             else
@@ -827,8 +864,9 @@ nothrow @safe:
         }
         else version(Windows)
         {
-            setForegroundColor(_initialForegroundColor, null);
-            setBackgroundColor(_initialBackgroundColor, null);
+            SetConsoleOutputCP(_initialCodepage);
+            setForegroundColor(TermColor.initial, null);
+            setBackgroundColor(TermColor.initial, null);
         }
         else
             assert(false);
@@ -852,6 +890,8 @@ nothrow @safe:
         {
             int code = convertTermColorToVT100Attr(color, false);
             fprintf(fileHandleForWrite, "\x1B[%dm", code);
+
+            fprintf(fileHandleForWrite, "\x1B[?12h");
         }
         else version(Windows)
         {
@@ -891,9 +931,24 @@ nothrow @safe:
             assert(false);
     }
 
+    bool enableUTF8() @trusted
+    {
+        version(Windows)
+        {
+            if (_console == null)
+                return false;
+
+            // Presumably Windows will restore it at the end of the process.
+            return SetConsoleOutputCP(65001) != 0; // CP_UTF8
+        }
+        else
+        {
+            return true;
+        }
+    }
+
 private:
 
-    // Successfully initialized.
     bool _initialized = false;
 
     // If we should use VT100 sequences (always true, except in Windows it can be false).
@@ -910,8 +965,9 @@ private:
 
     version(Windows)
     {
-        HANDLE _console;   // console handle.
-        WORD _currentAttr; // Last known cached console attribute.
+        HANDLE _console;       // console handle.
+        WORD _currentAttr;     // Last known cached console attribute.
+        UINT _initialCodepage; // Last known console codepage.
         CONSOLE_SCREEN_BUFFER_INFO consoleInfo;
     }
 
@@ -1175,6 +1231,8 @@ version(Windows)
                 // https://wiki.archlinux.org/title/Xterm#TERM_Environmental_Variable
                 return term == "xterm" || term == "xterm-256color";
             }
+            
+            return false;
         }
         catch(Exception e)
         {
