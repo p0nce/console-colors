@@ -28,6 +28,13 @@ void main(string[] args)
         }
 
         cwriteln;
+        cwriteln("*** STYLES".white);
+        cwriteln;
+        cwritefln("    <strong>bold</>      with <yellow>&lt;strong&gt;, &lt;b&gt;</yellow> or .in_bold");
+        cwritefln("    <em>italic</em>    with <yellow>&lt;em&gt;, &lt;i&gt;</yellow>     or .in_italic");
+        cwritefln("    <u>underline</u> with <yellow>&lt;u&gt;</yellow>           or .in_underline");
+        cwritefln("    <blink>blink</blink>     with <yellow>&lt;blink&gt;</yellow>       or .in_blink");
+        cwriteln;
         cwriteln("*** UNIVERSAL CLOSING TAG".white);
         cwriteln;
         cwriteln("    Closing <lgreen>nested <lcyan>tags <lmagenta>with just</><yellow> &lt;/&gt;</></></>");

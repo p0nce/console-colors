@@ -40,6 +40,8 @@ void main(string[] args)
 
 - Use 16 different colors in the terminal, for foreground and background.
 
+- Bold, italic, blink and underline.
+
 - Escape and un-escape from Console Colors Language (CCL), in order to mix and match coloured and uncoloured exceptions in your codebase.
   **Now you can `throw` with color information.**
 
@@ -67,7 +69,7 @@ You have no excuse anymore not to have colors in your terminal.
 
 ## Changelog
 
-- **v1.3** Windows VT-100 detection, skips the emulation layer. New `enableConsoleUTF8()` call to set UTF-8 on Windows.
+- **v1.3** Windows VT-100 detection, skips the emulation layer. New `enableConsoleUTF8()` call to set UTF-8 on Windows. Add bold, italic, underline and blink tags.
 
 - **v1.2** stderr support with `stderr.cwritexxx("some CCL text");`
 

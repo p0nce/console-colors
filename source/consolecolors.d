@@ -156,6 +156,15 @@ pure nothrow @safe
     string on_lcyan(const(char)[] text)    { return "<on_lcyan>" ~ text ~ "</on_lcyan>";       }
     ///ditto
     string on_white(const(char)[] text)    { return "<on_white>" ~ text ~ "</on_white>";       }
+
+    /// Change style of the console text.
+    string in_bold(const(char)[] text)     { return "<b>" ~ text ~ "</b>";                     }
+    ///ditto
+    string in_italic(const(char)[] text)   { return "<em>" ~ text ~ "</em>";                   }
+    ///ditto
+    string in_underline(const(char)[] text){ return "<u>" ~ text ~ "</u>";                     }
+    ///ditto
+    string in_blink(const(char)[] text)    { return "<blink>" ~ text ~ "</blink>";             }
 }
 
 /// Wraps text into a particular foreground color.
@@ -175,6 +184,9 @@ string color(const(char)[] text, const(char)[] color) pure @safe
 /// - <COLORNAME> such as:
 ///    <black>, <red>, <green>, <orange>, <blue>, <magenta>, <cyan>, <lgrey>, 
 ///    <grey>, <lred>, <lgreen>, <yellow>, <lblue>, <lmagenta>, <lcyan>, <white>
+///
+/// - STYLE tags, such as:
+///    <strong>, <b>, <em>, <i>, <u>, <blink>
 /// 
 /// Escaping:
 /// - To pass '<' as text and not a tag, use &lt;
@@ -239,7 +251,7 @@ void cwritefln(Char, T...)(File f, in Char[] fmt, T args)
     f.cwritef(fmt ~ "\n", args);
 }
 
-/// Disable output console colors.
+/// Disable output console colors and console styles.
 void disableConsoleColors()
 {
     g_termInterpreterStdout.disableColors();
@@ -361,7 +373,7 @@ struct TermInterpreter
         input = s;
         inputPos = 0;
 
-        stack(0) = Tag(TermColor.unknown, TermColor.unknown, "html");
+        stack(0) = Tag(TermColor.unknown, TermColor.unknown, TermStyle.none, "html");
         _tagStackIndex = 0;
 
         setForeground(TermColor.initial);
@@ -437,6 +449,7 @@ private:
     {
         TermColor fg = TermColor.unknown;  // last applied foreground color
         TermColor bg = TermColor.unknown;  // last applied background color
+        TermStyle style = TermStyle.none;
         const(char)[] name; // last applied tag
         int inputPos; // position of the opening tag in input chars.
     }
@@ -467,33 +480,59 @@ private:
 
         _tagStackIndex += 1;
 
-        bool bg = false;
-        if ((tagName.length >= 3) && (tagName[0..3] == "on_"))
-        {
-            tagName = tagName[3..$];
-            bg = true;
-        }       
-    
+        TermStyle currentStyle = _stack[_tagStackIndex].style;
+
         switch(tagName)
         {
-            case "black":    setColor(TermColor.black,    bg); break;
-            case "red":      setColor(TermColor.red,      bg); break;
-            case "green":    setColor(TermColor.green,    bg); break;
-            case "orange":   setColor(TermColor.orange,   bg); break;
-            case "blue":     setColor(TermColor.blue,     bg); break;
-            case "magenta":  setColor(TermColor.magenta,  bg); break;
-            case "cyan":     setColor(TermColor.cyan,     bg); break;
-            case "lgrey":    setColor(TermColor.lgrey,    bg); break;
-            case "grey":     setColor(TermColor.grey,     bg); break;
-            case "lred":     setColor(TermColor.lred,     bg); break;
-            case "lgreen":   setColor(TermColor.lgreen,   bg); break;
-            case "yellow":   setColor(TermColor.yellow,   bg); break;
-            case "lblue":    setColor(TermColor.lblue,    bg); break;
-            case "lmagenta": setColor(TermColor.lmagenta, bg); break;
-            case "lcyan":    setColor(TermColor.lcyan,    bg); break;
-            case "white":    setColor(TermColor.white,    bg); break;
+            case "b":
+            case "strong":
+                setStyle(currentStyle | TermStyle.bold);
+                break;
+
+            case "em":
+            case "i":
+                setStyle(currentStyle | TermStyle.italic);
+                break;
+
+            case "blink":
+                setStyle(currentStyle | TermStyle.blink);
+                break;
+
+            case "u":
+                setStyle(currentStyle | TermStyle.underline);
+                break;
+
             default:
-                break; // unknown tag
+            {
+                bool bg = false;
+                if ((tagName.length >= 3) && (tagName[0..3] == "on_"))
+                {
+                    tagName = tagName[3..$];
+                    bg = true;
+                }       
+
+                switch(tagName)
+                {
+                    case "black":    setColor(TermColor.black,    bg); break;
+                    case "red":      setColor(TermColor.red,      bg); break;
+                    case "green":    setColor(TermColor.green,    bg); break;
+                    case "orange":   setColor(TermColor.orange,   bg); break;
+                    case "blue":     setColor(TermColor.blue,     bg); break;
+                    case "magenta":  setColor(TermColor.magenta,  bg); break;
+                    case "cyan":     setColor(TermColor.cyan,     bg); break;
+                    case "lgrey":    setColor(TermColor.lgrey,    bg); break;
+                    case "grey":     setColor(TermColor.grey,     bg); break;
+                    case "lred":     setColor(TermColor.lred,     bg); break;
+                    case "lgreen":   setColor(TermColor.lgreen,   bg); break;
+                    case "yellow":   setColor(TermColor.yellow,   bg); break;
+                    case "lblue":    setColor(TermColor.lblue,    bg); break;
+                    case "lmagenta": setColor(TermColor.lmagenta, bg); break;
+                    case "lcyan":    setColor(TermColor.lcyan,    bg); break;
+                    case "white":    setColor(TermColor.white,    bg); break;
+                    default:
+                        break; // unknown tag
+                }
+            }
         }
     }
 
@@ -501,6 +540,13 @@ private:
     {
         if (bg) setBackground(c);
         else setForeground(c);
+    }
+
+    void setStyle(TermStyle style) nothrow @nogc
+    {
+        stackTop().style = style;
+        if (_enableTerm && _enableColors)
+            _terminal.setStyle(stackTop().style, &flushFileIfWindows);
     }
 
     void setForeground(TermColor fg) nothrow @nogc
@@ -524,6 +570,7 @@ private:
             // PERF: do this at once.
             _terminal.setForegroundColor(stackTop().fg, &flushFileIfWindows);
             _terminal.setBackgroundColor(stackTop().bg, &flushFileIfWindows);
+            _terminal.setStyle(stackTop().style, &flushFileIfWindows);
         }
     }
     
@@ -784,6 +831,14 @@ enum TermColor : int
     white,
 }
 
+enum TermStyle : int
+{
+    none      = 0, // no style
+    bold      = 1, // <b> or <strong>
+    italic    = 2, // <i> or <em>
+    underline = 4, // <u>
+    blink     = 8, // <blink> :)
+}
 
 // Term provide the following API:
 // - initialize(): capture existing colors, restore them in destructor
@@ -799,6 +854,11 @@ nothrow @safe:
     {
         // If we can tell early on that VT100 is enabled, use it.
         _useVT100 = terminalSupportsVT100Codes();
+
+        // Can probably assume the VT-100 terminal is not in bold,
+        // italic, blink or underline mode.
+        _initialStyle = TermStyle.none;
+        _currentStyle = TermStyle.none;
 
         if (_useVT100)
         {
@@ -890,8 +950,6 @@ nothrow @safe:
         {
             int code = convertTermColorToVT100Attr(color, false);
             fprintf(fileHandleForWrite, "\x1B[%dm", code);
-
-            fprintf(fileHandleForWrite, "\x1B[?12h");
         }
         else version(Windows)
         {
@@ -931,6 +989,45 @@ nothrow @safe:
             assert(false);
     }
 
+    void setStyle(TermStyle style, scope void delegate() nothrow @nogc callThisBeforeChangingColor) @nogc @trusted
+    {
+        if (!_useVT100)
+            return;
+
+        if (style == _currentStyle)
+            return;
+
+        // Note probably useless in Windows + VT-100 emulation? with style being in-band
+        if (callThisBeforeChangingColor)
+            callThisBeforeChangingColor();
+
+        
+
+        // PERF: could be a bit more optimal than that
+        fprintf(fileHandleForWrite, "\x1B[0m");
+
+        // The problem is that it erase fg and bg colors if any. Reinstate them.
+
+        if (_currentBackgroundColor != TermColor.initial 
+            && _currentBackgroundColor != TermColor.unknown)
+        {
+            int code = convertTermColorToVT100Attr(_currentBackgroundColor, true);
+            fprintf(fileHandleForWrite, "\x1B[%dm", code);
+        }
+        if (_currentForegroundColor != TermColor.initial 
+            && _currentForegroundColor != TermColor.unknown)
+        {
+            int code = convertTermColorToVT100Attr(_currentForegroundColor, false);
+            fprintf(fileHandleForWrite, "\x1B[%dm", code);
+        }
+
+        if (style & TermStyle.bold)      fprintf(fileHandleForWrite, "\x1B[1m");
+        if (style & TermStyle.italic)    fprintf(fileHandleForWrite, "\x1B[3m");
+        if (style & TermStyle.underline) fprintf(fileHandleForWrite, "\x1B[4m");
+        if (style & TermStyle.blink)     fprintf(fileHandleForWrite, "\x1B[5m");
+        _currentStyle = style;
+    }
+
     bool enableUTF8() @trusted
     {
         version(Windows)
@@ -958,10 +1055,12 @@ private:
     // At initialization, find those.
     TermColor _initialForegroundColor = TermColor.unknown;
     TermColor _initialBackgroundColor = TermColor.unknown;
+    TermStyle _initialStyle           = TermStyle.none;
 
     // Act as cache to avoid useless syscalls.
     TermColor _currentForegroundColor = TermColor.unknown;
     TermColor _currentBackgroundColor = TermColor.unknown;
+    TermStyle _currentStyle           = TermStyle.none;
 
     version(Windows)
     {
@@ -1276,6 +1375,10 @@ unittest
         {
             stderr.cwritefln("   <lred>error:</lred> you failed.");
         }();
+        cwriteln(``);
+        cwriteln(`   <lmagenta>// Writing with style (VT-100 only)</lmagenta>`);
+        cwriteln(`   cwriteln<yellow>(</yellow><green>"&lt;b&gt;bold&lt;/b&gt; &lt;i&gt;italic&lt;/i&gt; &lt;u&gt;under&lt;/u&gt; &lt;blink&gt;blink&lt;/blink&gt;"</green><yellow>);</yellow>`);
+        cwriteln("   <b>bold</b> <i>italic</i> <u>under</u> <blink>blink</blink>".lgrey);
         cwriteln(``);
     }
     catch(Exception e)
