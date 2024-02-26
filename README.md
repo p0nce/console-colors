@@ -54,7 +54,7 @@ void main(string[] args)
 
 - Portable with a special `cwrite[f][ln]` call, like the `colorize` package.
   Indeed, color information need to be **inline within text**, to properly nest in format strings.
-  `console-colors` has a color stack to restore the previously set color.
+  `console-colors` has a color stack to restore the previously set color and font style.
 
 - All colors have an easy shortcut like `.lmagenta` or `.white`, making it easier to add color in the first place (at the cost of your namespace).
 
